@@ -90,7 +90,7 @@
       outline: none;
     }
   </style>
-  <title>Sistema Institucional de Gestión de Contratos</title>
+  <title>Sistema Institucional de Gestión de Contratos (DB AI)</title>
 </head>
 
 <body class="bg-[#F8F9FA] text-inst-dark font-sans min-h-screen antialiased flex flex-col">
@@ -121,7 +121,7 @@
               stroke="currentColor">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
             </svg>
-            <span>Registrar Contrato</span>
+            <span>Crear Contrato Manual</span>
           </button>
         </div>
       </div>
@@ -132,10 +132,12 @@
   <main class="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 w-full">
 
     <!-- Stats/Header Area -->
-    <div class="mb-8 border-l-4 border-inst-gold pl-4">
-      <h1 class="text-3xl font-light text-inst-dark tracking-tight">Directorio General</h1>
-      <p class="mt-2 text-sm text-inst-gray max-w-2xl leading-relaxed">Consulta y administra la cartera de contratos de
-        la dependencia. Mantenga un control preciso sobre vigencias y estados operativos.</p>
+    <div class="mb-8 border-l-4 border-inst-gold pl-4 flex justify-between items-center">
+      <div>
+        <h1 class="text-3xl font-light text-inst-dark tracking-tight">Directorio Relacional IA</h1>
+        <p class="mt-2 text-sm text-inst-gray max-w-2xl leading-relaxed">Consulta la tabla de contratos sincronizada
+          desde el agente de ingesta de documentos o realiza registros manuales de apoyo.</p>
+      </div>
     </div>
 
     <!-- Table Container -->
@@ -165,16 +167,16 @@
             <tr>
               <th scope="col"
                 class="px-6 py-5 text-left text-xs font-bold text-inst-burgundy uppercase tracking-widest bg-opacity-10 bg-inst-burgundy">
-                Expediente</th>
+                Contrato N°</th>
               <th scope="col"
                 class="px-6 py-5 text-left text-xs font-bold text-inst-burgundy uppercase tracking-widest bg-opacity-10 bg-inst-burgundy">
-                Cliente / Dependencia</th>
+                Contratista</th>
               <th scope="col"
                 class="px-6 py-5 text-left text-xs font-bold text-inst-burgundy uppercase tracking-widest bg-opacity-10 bg-inst-burgundy">
-                Periodo de Vigencia</th>
+                Periodo de Ejecución</th>
               <th scope="col"
                 class="px-6 py-5 text-left text-xs font-bold text-inst-burgundy uppercase tracking-widest bg-opacity-10 bg-inst-burgundy">
-                Estado</th>
+                Estado Legal</th>
               <th scope="col"
                 class="px-6 py-5 text-right text-xs font-bold text-inst-burgundy uppercase tracking-widest bg-opacity-10 bg-inst-burgundy">
                 Gestión</th>
@@ -191,11 +193,11 @@
   <!-- Footer -->
   <footer class="bg-white border-t border-gray-200 py-6 mt-10">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center text-sm text-inst-gray">
-      &copy; 2026 Sistema Institucional de Gestión de Contratos. Todos los derechos reservados.
+      &copy; 2026 Sistema Institucional de Gestión de Contratos. AI Document Processing.
     </div>
   </footer>
 
-  <!-- Modal Form -->
+  <!-- Modal Form (Manual Entry Matching Relational Schema) -->
   <div id="contractModal" class="fixed inset-0 z-50 hidden" aria-labelledby="modal-title" role="dialog"
     aria-modal="true">
     <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
@@ -218,67 +220,95 @@
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                 d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
             </svg>
-            <span>Nuevo Contrato</span>
+            <span>Registro Contrato</span>
           </h3>
 
           <form id="contractForm" onsubmit="saveContract(event)">
-            <input type="hidden" id="contractId" name="ID">
+            <input type="hidden" id="contractId" name="ID_Contrato">
 
             <div class="space-y-5">
               <div>
-                <label for="contractNumero" class="block text-sm font-semibold text-inst-dark mb-1">Número de Registro /
-                  Expediente</label>
+                <label for="contractNumero" class="block text-sm font-semibold text-inst-dark mb-1">Número de
+                  Contrato</label>
                 <input type="text" id="contractNumero" required
                   class="elegant-input block w-full border border-gray-300 rounded-md py-2.5 px-3 sm:text-sm text-inst-dark placeholder-gray-400"
-                  placeholder="Ej. CONT-2026-001">
+                  placeholder="Ej. 25-E-CF-A-002-Y-0-25">
               </div>
 
               <div>
-                <label for="contractCliente" class="block text-sm font-semibold text-inst-dark mb-1">Entidad /
-                  Dependencia Comercial</label>
-                <input type="text" id="contractCliente" required
+                <label for="contractContratista"
+                  class="block text-sm font-semibold text-inst-dark mb-1">Contratista</label>
+                <input type="text" id="contractContratista" required
                   class="elegant-input block w-full border border-gray-300 rounded-md py-2.5 px-3 sm:text-sm text-inst-dark"
-                  placeholder="Nombre completo">
+                  placeholder="Razón Social">
               </div>
 
               <div>
-                <label for="contractMonto" class="block text-sm font-semibold text-inst-dark mb-1">Asignación
-                  Presupuestal ($)</label>
-                <div class="relative rounded-md shadow-sm">
-                  <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                    <span class="text-inst-gray font-medium sm:text-sm">$</span>
-                  </div>
-                  <input type="number" step="0.01" id="contractMonto" required
-                    class="elegant-input block w-full pl-8 border border-gray-300 rounded-md py-2.5 px-3 sm:text-sm font-medium text-inst-dark"
-                    placeholder="0.00">
+                <label for="contractObjeto" class="block text-sm font-semibold text-inst-dark mb-1">Objeto del
+                  Contrato</label>
+                <input type="text" id="contractObjeto"
+                  class="elegant-input block w-full border border-gray-300 rounded-md py-2.5 px-3 sm:text-sm text-inst-dark"
+                  placeholder="Descripción de los servicios...">
+              </div>
+
+              <div class="grid grid-cols-2 gap-5">
+                <div>
+                  <label for="contractConvenio" class="block text-sm font-semibold text-inst-dark mb-1">Convenio
+                    Vinculado</label>
+                  <input type="text" id="contractConvenio"
+                    class="elegant-input block w-full border border-gray-300 rounded-md py-2.5 px-3 sm:text-sm text-inst-dark"
+                    placeholder="ID / UUID Convenio">
+                </div>
+                <div>
+                  <label for="contractRFC" class="block text-sm font-semibold text-inst-dark mb-1">RFC</label>
+                  <input type="text" id="contractRFC"
+                    class="elegant-input block w-full border border-gray-300 rounded-md py-2.5 px-3 sm:text-sm text-inst-dark"
+                    placeholder="ABC123456T8">
                 </div>
               </div>
 
               <div class="grid grid-cols-2 gap-5">
                 <div>
-                  <label for="contractInicio" class="block text-sm font-semibold text-inst-dark mb-1">Fecha de
-                    Inicio</label>
+                  <label for="contractMontoSin" class="block text-sm font-semibold text-inst-dark mb-1">Monto Sin IVA
+                    ($)</label>
+                  <div class="relative rounded-md shadow-sm">
+                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <span class="text-inst-gray font-medium sm:text-sm">$</span>
+                    </div>
+                    <input type="number" step="0.01" id="contractMontoSin"
+                      class="elegant-input block w-full pl-8 border border-gray-300 rounded-md py-2.5 px-3 sm:text-sm font-medium text-inst-dark"
+                      placeholder="0.00">
+                  </div>
+                </div>
+                <div>
+                  <label for="contractMontoCon" class="block text-sm font-semibold text-inst-dark mb-1">Monto Con IVA
+                    ($)</label>
+                  <div class="relative rounded-md shadow-sm">
+                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <span class="text-inst-gray font-medium sm:text-sm">$</span>
+                    </div>
+                    <input type="number" step="0.01" id="contractMontoCon" required
+                      class="elegant-input block w-full pl-8 border border-gray-300 rounded-md py-2.5 px-3 sm:text-sm font-medium text-inst-dark"
+                      placeholder="0.00">
+                  </div>
+                </div>
+              </div>
+
+              <div class="grid grid-cols-2 gap-5">
+                <div>
+                  <label for="contractInicio" class="block text-sm font-semibold text-inst-dark mb-1">Fecha de Ejecución
+                    (Inicio)</label>
                   <input type="date" id="contractInicio" required
                     class="elegant-input block w-full border border-gray-300 rounded-md py-2.5 px-3 text-inst-gray focus:text-inst-dark sm:text-sm">
                 </div>
                 <div>
-                  <label for="contractFin" class="block text-sm font-semibold text-inst-dark mb-1">Fecha de
-                    Término</label>
+                  <label for="contractFin" class="block text-sm font-semibold text-inst-dark mb-1">Fecha de Ejecución
+                    (Fin)</label>
                   <input type="date" id="contractFin" required
                     class="elegant-input block w-full border border-gray-300 rounded-md py-2.5 px-3 text-inst-gray focus:text-inst-dark sm:text-sm">
                 </div>
               </div>
 
-              <div>
-                <label for="contractEstado" class="block text-sm font-semibold text-inst-dark mb-1">Estado de
-                  Ejecución</label>
-                <select id="contractEstado"
-                  class="elegant-input block w-full bg-white border border-gray-300 rounded-md py-2.5 px-3 sm:text-sm font-medium text-inst-dark">
-                  <option value="Activo">Activo</option>
-                  <option value="Finalizado">Finalizado</option>
-                  <option value="Cancelado">Cancelado</option>
-                </select>
-              </div>
             </div>
 
             <div class="mt-8 pt-5 border-t border-gray-100 flex justify-end gap-3">
@@ -301,7 +331,6 @@
   <div id="toast"
     class="fixed bottom-6 right-6 z-50 transform transition-all duration-400 translate-y-20 opacity-0 shadow-2xl rounded-lg overflow-hidden flex border-l-4">
     <div id="toastIcon" class="px-4 flex items-center justify-center">
-      <!-- Icon injected by JS -->
     </div>
     <div class="bg-white px-5 py-4 flex items-center min-w-[250px]">
       <span id="toastMessage" class="font-medium text-inst-dark text-sm"></span>
@@ -351,23 +380,17 @@
       tbody.innerHTML = '';
 
       if (contracts.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" class="px-6 py-16 text-center text-inst-gray"><div class="flex flex-col mx-auto items-center justify-center mb-3 text-gray-300"><svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg></div><span class="block text-base font-medium text-inst-dark mb-1">Sin registros institucionales</span><span>Haga clic en "Registrar Contrato" para iniciar.</span></td></tr>';
+        tbody.innerHTML = '<tr><td colspan="5" class="px-6 py-16 text-center text-inst-gray"><div class="flex flex-col mx-auto items-center justify-center mb-3 text-gray-300"><svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg></div><span class="block text-base font-medium text-inst-dark mb-1">Sin registros extraídos</span><span>El agente IA poblará este listado cuando procese documentos.</span></td></tr>';
       } else {
         contracts.forEach(contract => {
           const tr = document.createElement('tr');
           tr.className = 'hover:bg-[#F8F9FA] transition-colors duration-200 group';
 
-          let statusBadge = '';
-          if (contract.Estado === 'Activo') {
-            statusBadge = '<span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold border border-inst-green bg-inst-green bg-opacity-10 text-inst-darkGreen"><span class="w-1.5 h-1.5 bg-inst-green rounded-full mr-1.5"></span>Activo</span>';
-          } else if (contract.Estado === 'Cancelado') {
-            statusBadge = '<span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold border border-inst-burgundyLight bg-inst-burgundyLight bg-opacity-10 text-inst-burgundyLight"><span class="w-1.5 h-1.5 bg-inst-burgundyLight rounded-full mr-1.5"></span>Cancelado</span>';
-          } else {
-            statusBadge = '<span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold border border-inst-gray bg-inst-gray bg-opacity-10 text-inst-dark"><span class="w-1.5 h-1.5 bg-inst-gray rounded-full mr-1.5"></span>Finalizado</span>';
-          }
+          // Since the IA doesn't have an "Estado" by default, we apply a placeholder
+          let statusBadge = '<span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold border border-inst-green bg-inst-green bg-opacity-10 text-inst-darkGreen"><span class="w-1.5 h-1.5 bg-inst-green rounded-full mr-1.5"></span>Registrado</span>';
 
           // Format currency
-          const monto = parseFloat(contract.Monto || 0);
+          const monto = parseFloat(contract.Monto_Total_Con_IVA || 0);
           const montoFormat = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(monto);
 
           // Format dates elegantly
@@ -384,29 +407,30 @@
                       <div class="flex items-center">
                         <div class="w-8 h-8 rounded-full bg-inst-burgundy bg-opacity-10 text-inst-burgundy flex items-center justify-center font-bold mr-3 text-xs">#</div>
                         <div>
-                          <div class="text-sm font-bold text-inst-dark group-hover:text-inst-burgundy transition-colors">${contract.Numero || 'S/N'}</div>
+                          <div class="text-sm font-bold text-inst-dark group-hover:text-inst-burgundy transition-colors">${contract.Numero_Contrato || 'S/N'}</div>
                           <div class="text-sm text-inst-gray font-medium mt-0.5"><span class="text-inst-gold font-semibold">${montoFormat}</span></div>
                         </div>
                       </div>
                     </td>
                     <td class="px-6 py-5 whitespace-normal">
-                      <div class="text-sm font-semibold text-inst-dark line-clamp-2">${contract.Cliente || 'N/A'}</div>
+                      <div class="text-sm font-semibold text-inst-dark line-clamp-2">${contract.Contratista || 'N/A'}</div>
+                      <div class="text-xs text-inst-gray font-medium line-clamp-1 mt-1">${contract.Objeto_Contrato || 'Objeto de servicio...'}</div>
                     </td>
                     <td class="px-6 py-5 whitespace-nowrap">
-                      ${formatDate(contract.FechaInicio, 'Del')}
-                      ${formatDate(contract.FechaFin, 'Al')}
+                      ${formatDate(contract.Fecha_Inicio, 'Del')}
+                      ${formatDate(contract.Fecha_Fin, 'Al')}
                     </td>
                     <td class="px-6 py-5 whitespace-nowrap">
                       ${statusBadge}
                     </td>
                     <td class="px-6 py-5 whitespace-nowrap text-right text-sm font-medium">
                       <div class="flex items-center justify-end gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button onclick="editContract('${contract.ID}')" class="text-inst-gold hover:text-inst-burgundy p-1.5 rounded-md hover:bg-gray-100 transition-colors" title="Editar">
+                        <button onclick="editContract('${contract.ID_Contrato}')" class="text-inst-gold hover:text-inst-burgundy p-1.5 rounded-md hover:bg-gray-100 transition-colors" title="Editar">
                           <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
                           </svg>
                         </button>
-                        <button onclick="deleteContract('${contract.ID}')" class="text-inst-gray hover:text-inst-burgundyLight p-1.5 rounded-md hover:bg-gray-100 transition-colors" title="Eliminar">
+                        <button onclick="deleteContract('${contract.ID_Contrato}')" class="text-inst-gray hover:text-inst-burgundyLight p-1.5 rounded-md hover:bg-gray-100 transition-colors" title="Eliminar">
                           <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                           </svg>
@@ -432,7 +456,7 @@
     function openModal() {
       document.getElementById('contractForm').reset();
       document.getElementById('contractId').value = '';
-      document.getElementById('modalTitle').innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-inst-gold" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg><span>Nuevo Contrato</span>';
+      document.getElementById('modalTitle').innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-inst-gold" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg><span>Nuevo Contrato Relacional</span>';
       modal.classList.remove('hidden');
       modal.querySelector('.inline-block').classList.add('modal-enter-active');
     }
@@ -442,24 +466,27 @@
     }
 
     function editContract(id) {
-      const contract = currentContracts.find(c => c.ID === id);
+      const contract = currentContracts.find(c => c.ID_Contrato === id);
       if (contract) {
-        document.getElementById('contractId').value = contract.ID || '';
-        document.getElementById('contractNumero').value = contract.Numero || '';
-        document.getElementById('contractCliente').value = contract.Cliente || '';
-        document.getElementById('contractMonto').value = contract.Monto || '';
+        document.getElementById('contractId').value = contract.ID_Contrato || '';
+        document.getElementById('contractNumero').value = contract.Numero_Contrato || '';
+        document.getElementById('contractContratista').value = contract.Contratista || '';
+        document.getElementById('contractConvenio').value = contract.ID_Convenio_Vinculado || '';
+        document.getElementById('contractRFC').value = contract.RFC_Contratista || '';
+        document.getElementById('contractObjeto').value = contract.Objeto_Contrato || '';
+        document.getElementById('contractMontoSin').value = contract.Monto_Sin_IVA || '';
+        document.getElementById('contractMontoCon').value = contract.Monto_Total_Con_IVA || '';
 
-        if (contract.FechaInicio) {
-          const d = new Date(contract.FechaInicio);
+        if (contract.Fecha_Inicio) {
+          const d = new Date(contract.Fecha_Inicio);
           if (!isNaN(d)) document.getElementById('contractInicio').value = d.toISOString().split('T')[0];
         }
-        if (contract.FechaFin) {
-          const d = new Date(contract.FechaFin);
+        if (contract.Fecha_Fin) {
+          const d = new Date(contract.Fecha_Fin);
           if (!isNaN(d)) document.getElementById('contractFin').value = d.toISOString().split('T')[0];
         }
 
-        document.getElementById('contractEstado').value = contract.Estado || 'Activo';
-        document.getElementById('modalTitle').innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-inst-gold" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg><span>Modificar Contrato</span>';
+        document.getElementById('modalTitle').innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-inst-gold" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg><span>Modificar Contrato Relacional</span>';
         modal.classList.remove('hidden');
       }
     }
@@ -472,20 +499,23 @@
       btn.disabled = true;
 
       const data = {
-        ID: document.getElementById('contractId').value,
-        Numero: document.getElementById('contractNumero').value,
-        Cliente: document.getElementById('contractCliente').value,
-        Monto: document.getElementById('contractMonto').value,
-        FechaInicio: document.getElementById('contractInicio').value,
-        FechaFin: document.getElementById('contractFin').value,
-        Estado: document.getElementById('contractEstado').value
+        ID_Contrato: document.getElementById('contractId').value,
+        Numero_Contrato: document.getElementById('contractNumero').value,
+        ID_Convenio_Vinculado: document.getElementById('contractConvenio').value,
+        Contratista: document.getElementById('contractContratista').value,
+        RFC_Contratista: document.getElementById('contractRFC').value,
+        Objeto_Contrato: document.getElementById('contractObjeto').value,
+        Monto_Sin_IVA: document.getElementById('contractMontoSin').value,
+        Monto_Total_Con_IVA: document.getElementById('contractMontoCon').value,
+        Fecha_Inicio: document.getElementById('contractInicio').value,
+        Fecha_Fin: document.getElementById('contractFin').value
       };
 
       google.script.run
         .withSuccessHandler(() => {
           closeModal();
           loadContracts();
-          showToast('Expediente actualizado con éxito');
+          showToast('Registro actualizado exitosamente en DB');
           btn.innerHTML = originalContent;
           btn.disabled = false;
         })
@@ -502,7 +532,7 @@
         google.script.run
           .withSuccessHandler(() => {
             loadContracts();
-            showToast('Expediente dado de baja');
+            showToast('Expediente eliminado de DB Relacional');
           })
           .withFailureHandler((error) => showToast('Imposible eliminar registro: ' + error.message, true))
           .deleteContract(id);
