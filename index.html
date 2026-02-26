@@ -252,13 +252,6 @@
                   placeholder="Razón Social">
               </div>
 
-              <div>
-                <label for="contractObjeto" class="block text-sm font-semibold text-inst-dark mb-1">Objeto del
-                  Contrato</label>
-                <input type="text" id="contractObjeto"
-                  class="elegant-input block w-full border border-gray-300 rounded-md py-2.5 px-3 sm:text-sm text-inst-dark"
-                  placeholder="Descripción de los servicios...">
-              </div>
 
               <div class="grid grid-cols-2 gap-5">
                 <div>
@@ -276,30 +269,17 @@
                 </div>
               </div>
 
-              <div class="grid grid-cols-2 gap-5">
-                <div>
-                  <label for="contractMontoSin" class="block text-sm font-semibold text-inst-dark mb-1">Monto Sin IVA
-                    ($)</label>
-                  <div class="relative rounded-md shadow-sm">
-                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <span class="text-inst-gray font-medium sm:text-sm">$</span>
-                    </div>
-                    <input type="number" step="0.01" id="contractMontoSin"
-                      class="elegant-input block w-full pl-8 border border-gray-300 rounded-md py-2.5 px-3 sm:text-sm font-medium text-inst-dark"
-                      placeholder="0.00">
+              <div>
+                <label for="contractMontoCon" class="block text-sm font-semibold text-inst-dark mb-1">Monto Total Con
+                  IVA
+                  ($)</label>
+                <div class="relative rounded-md shadow-sm">
+                  <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <span class="text-inst-gray font-medium sm:text-sm">$</span>
                   </div>
-                </div>
-                <div>
-                  <label for="contractMontoCon" class="block text-sm font-semibold text-inst-dark mb-1">Monto Con IVA
-                    ($)</label>
-                  <div class="relative rounded-md shadow-sm">
-                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                      <span class="text-inst-gray font-medium sm:text-sm">$</span>
-                    </div>
-                    <input type="number" step="0.01" id="contractMontoCon" required
-                      class="elegant-input block w-full pl-8 border border-gray-300 rounded-md py-2.5 px-3 sm:text-sm font-medium text-inst-dark"
-                      placeholder="0.00">
-                  </div>
+                  <input type="number" step="0.01" id="contractMontoCon" required
+                    class="elegant-input block w-full pl-8 border border-gray-300 rounded-md py-2.5 px-3 sm:text-sm font-medium text-inst-dark"
+                    placeholder="0.00">
                 </div>
               </div>
 
@@ -478,7 +458,7 @@
                     </td>
                     <td class="px-6 py-5 whitespace-normal">
                       <div class="text-sm font-semibold text-inst-dark line-clamp-2">${contract.Contratista || 'N/A'}</div>
-                      <div class="text-xs text-inst-gray font-medium line-clamp-1 mt-1">${contract.Objeto_Contrato || 'Objeto de servicio...'}</div>
+                      <div class="text-xs text-inst-gray font-medium line-clamp-1 mt-1">RFC: ${contract.RFC_Contratista || 'S/D'}</div>
                     </td>
                     <td class="px-6 py-5 whitespace-nowrap">
                       ${formatDate(contract.Fecha_Inicio, 'Del')}
@@ -537,8 +517,6 @@
         document.getElementById('contractContratista').value = contract.Contratista || '';
         document.getElementById('contractConvenio').value = contract.ID_Convenio_Vinculado || '';
         document.getElementById('contractRFC').value = contract.RFC_Contratista || '';
-        document.getElementById('contractObjeto').value = contract.Objeto_Contrato || '';
-        document.getElementById('contractMontoSin').value = contract.Monto_Sin_IVA || '';
         document.getElementById('contractMontoCon').value = contract.Monto_Total_Con_IVA || '';
 
         if (contract.Fecha_Inicio) {
@@ -568,8 +546,6 @@
         ID_Convenio_Vinculado: document.getElementById('contractConvenio').value,
         Contratista: document.getElementById('contractContratista').value,
         RFC_Contratista: document.getElementById('contractRFC').value,
-        Objeto_Contrato: document.getElementById('contractObjeto').value,
-        Monto_Sin_IVA: document.getElementById('contractMontoSin').value,
         Monto_Total_Con_IVA: document.getElementById('contractMontoCon').value,
         Fecha_Inicio: document.getElementById('contractInicio').value,
         Fecha_Fin: document.getElementById('contractFin').value

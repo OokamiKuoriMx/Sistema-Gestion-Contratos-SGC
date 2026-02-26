@@ -5,8 +5,8 @@
  */
 function setupInicialTablas() {
     try {
-        initTablas();
-        Logger.log("✅ Tablas inicializadas correctamente de acuerdo al ESQUEMA_BD.");
+        configurarBaseDeDatos();
+        Logger.log("✅ Tablas inicializadas correctamente de acuerdo al ESQUEMA_BD de 5 tablas.");
     } catch (error) {
         Logger.log("❌ Error inicializando tablas: " + error.message);
     }

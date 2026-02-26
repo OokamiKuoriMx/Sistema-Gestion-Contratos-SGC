@@ -9,10 +9,11 @@ function getSpreadsheet() {
 
 // Esquema Relacional de Base de Datos para extracción IA
 var ESQUEMA_BD = {
-    'Convenios': ['ID_Convenio', 'Numero_Acuerdo', 'Monto_Apoyo', 'Vigencia_Fin', 'Objeto_Programa', 'Proyectos_Asociados'],
-    'Contratos': ['ID_Contrato', 'Numero_Contrato', 'ID_Convenio_Vinculado', 'Contratista', 'RFC_Contratista', 'Objeto_Contrato', 'Monto_Sin_IVA', 'Monto_Total_Con_IVA', 'Fecha_Inicio', 'Fecha_Fin'],
-    'Programa_Ejecucion': ['ID_Programa', 'ID_Contrato', 'Clave_Concepto_Periodo', 'Descripcion', 'Unidad', 'Cantidad', 'Precio_Unitario', 'Importe_Total'],
-    'Estimaciones_Pagos': ['ID_Pago', 'ID_Contrato', 'No_Estimacion', 'Folio_Factura', 'Fecha_Factura', 'Periodo_Inicio', 'Periodo_Fin', 'Monto_Bruto', 'Deducciones', 'Monto_Neto_A_Pagar', 'Beneficiario', 'Cuenta_CLABE']
+    'Convenios': ['ID_Convenio', 'Numero_Acuerdo', 'Monto_Apoyo', 'Vigencia_Fin', 'Objeto_Programa', 'Estado'],
+    'Contratos': ['ID_Contrato', 'Numero_Contrato', 'ID_Convenio_Vinculado', 'Contratista', 'RFC_Contratista', 'Monto_Total_Con_IVA', 'Fecha_Inicio', 'Fecha_Fin'],
+    'Catalogo_Conceptos': ['ID_Concepto', 'ID_Contrato', 'Clave', 'Descripcion', 'Unidad', 'Cantidad_Contratada', 'Precio_Unitario', 'Importe_Total_Contratado'],
+    'Estimaciones_Pagos': ['ID_Estimacion', 'ID_Contrato', 'No_Estimacion', 'Folio_Factura', 'Fecha_Factura', 'Periodo_Inicio', 'Periodo_Fin', 'Monto_Bruto', 'Deducciones', 'Monto_Neto_A_Pagar', 'Cuenta_CLABE'],
+    'Detalle_Estimacion': ['ID_Detalle', 'ID_Estimacion', 'Clave_Concepto', 'Porcentaje_Avance_Este_Periodo', 'Importe_Este_Periodo', 'Avance_Acumulado_Porcentaje', 'Importe_Acumulado']
 };
 
 function doGet() {
@@ -24,18 +25,41 @@ function doGet() {
 }
 
 /**
- * Función inicializadora: Crea las 4 pestañas de la BD relacional si no existen
+ * Función inicializadora: Crea las 5 pestañas de la BD relacional si no existen y elimina deprecadas
  */
-function initTablas() {
+function configurarBaseDeDatos() {
     const ss = getSpreadsheet();
+
+    // Eliminar hojas obsoletas
+    const hojaObsoleta = ss.getSheetByName('Programa_Ejecucion');
+    if (hojaObsoleta) {
+        ss.deleteSheet(hojaObsoleta);
+    }
+
     for (const tabla in ESQUEMA_BD) {
         let sheet = ss.getSheetByName(tabla);
+        const headers = ESQUEMA_BD[tabla];
+
         if (!sheet) {
             sheet = ss.insertSheet(tabla);
-            sheet.appendRow(ESQUEMA_BD[tabla]);
-            // Formato básico de la cabecera
-            sheet.getRange(1, 1, 1, ESQUEMA_BD[tabla].length).setFontWeight("bold").setBackground("#611232").setFontColor("white");
-            sheet.setFrozenRows(1);
+            sheet.appendRow(headers);
+        } else {
+            // Limpiar la fila 1 y escribir nuevos encabezados
+            sheet.getRange(1, 1, 1, sheet.getMaxColumns()).clear();
+            sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+        }
+
+        // Formato visual y configuración como "Tabla"
+        const headerRange = sheet.getRange(1, 1, 1, headers.length);
+        headerRange.setFontWeight("bold").setBackground("#611232").setFontColor("#FFFFFF");
+        sheet.setFrozenRows(1);
+
+        if (!sheet.getFilter()) {
+            headerRange.createFilter();
+        }
+        const banding = sheet.getBandings();
+        if (banding.length === 0) {
+            sheet.getRange(1, 1, sheet.getMaxRows(), headers.length).applyRowBanding(SpreadsheetApp.BandingTheme.LIGHT_GREY);
         }
     }
 }
@@ -57,7 +81,7 @@ function doPost(e) {
         const payload = JSON.parse(e.postData.contents);
 
         if (payload.accion === "importar_datos" && payload.datos) {
-            initTablas();
+            configurarBaseDeDatos();
             const ss = getSpreadsheet();
             let resultados = {};
 
@@ -113,7 +137,7 @@ function errorResponse(msg) {
 
 function getContracts() {
     try {
-        initTablas();
+        configurarBaseDeDatos();
         const sheet = getSpreadsheet().getSheetByName('Contratos');
         const data = sheet.getDataRange().getValues();
         if (data.length <= 1) return [];
@@ -136,7 +160,7 @@ function getContracts() {
 
 function saveContract(contractData) {
     try {
-        initTablas();
+        configurarBaseDeDatos();
         const sheet = getSpreadsheet().getSheetByName('Contratos');
         const headers = ESQUEMA_BD['Contratos'];
 

@@ -11,11 +11,12 @@ Eres un Agente de Inteligencia Artificial experto en procesamiento de documentos
 Contexto del Negocio:
 El sistema administra la cartera de contratos de una dependencia gubernamental. Los contratos de obra pública o servicios están financiados por Convenios de Apoyo Financiero. A su vez, los contratos tienen Programas de Ejecución y generan Estimaciones de Pago. 
 
-Estructura de la Base de Datos (4 Tablas Relacionales a generar en objeto de salida):
-1. Convenios: ID_Convenio, Numero_Acuerdo, Monto_Apoyo, Vigencia_Fin, Objeto_Programa, Proyectos_Asociados.
-2. Contratos: ID_Contrato, Numero_Contrato, ID_Convenio_Vinculado, Contratista, RFC_Contratista, Objeto_Contrato, Monto_Sin_IVA, Monto_Total_Con_IVA, Fecha_Inicio, Fecha_Fin.
-3. Programa_Ejecucion: ID_Programa, ID_Contrato, Clave_Concepto_Periodo, Descripcion, Unidad, Cantidad, Precio_Unitario, Importe_Total.
-4. Estimaciones_Pagos: ID_Pago, ID_Contrato, No_Estimacion, Folio_Factura, Fecha_Factura, Periodo_Inicio, Periodo_Fin, Monto_Bruto, Deducciones, Monto_Neto_A_Pagar, Beneficiario, Cuenta_CLABE.
+Estructura de la Base de Datos (5 Tablas Relacionales a generar en objeto de salida):
+1. Convenios: ID_Convenio, Numero_Acuerdo, Monto_Apoyo, Vigencia_Fin, Objeto_Programa, Estado.
+2. Contratos: ID_Contrato, Numero_Contrato, ID_Convenio_Vinculado, Contratista, RFC_Contratista, Monto_Total_Con_IVA, Fecha_Inicio, Fecha_Fin.
+3. Catalogo_Conceptos: ID_Concepto, ID_Contrato, Clave, Descripcion, Unidad, Cantidad_Contratada, Precio_Unitario, Importe_Total_Contratado.
+4. Estimaciones_Pagos: ID_Estimacion, ID_Contrato, No_Estimacion, Folio_Factura, Fecha_Factura, Periodo_Inicio, Periodo_Fin, Monto_Bruto, Deducciones, Monto_Neto_A_Pagar, Cuenta_CLABE.
+5. Detalle_Estimacion: ID_Detalle, ID_Estimacion, Clave_Concepto, Porcentaje_Avance_Este_Periodo, Importe_Este_Periodo, Avance_Acumulado_Porcentaje, Importe_Acumulado.
 
 Extracción y Limpieza: 
 - Extrae montos a número flotante sin '$' ni ','.
@@ -26,10 +27,11 @@ Output: Extrae estrictamente un objeto JSON:
 {
   "accion": "importar_datos",
   "datos": {
-    "Contratos": [...],
     "Convenios": [...],
-    "Programa_Ejecucion": [...],
-    "Estimaciones_Pagos": [...]
+    "Contratos": [...],
+    "Catalogo_Conceptos": [...],
+    "Estimaciones_Pagos": [...],
+    "Detalle_Estimacion": [...]
   }
 }
 `;
@@ -114,7 +116,7 @@ function processDocumentWithAI(base64Data, mimeType) {
  * Función auxiliar para insertar los datos en las pestañas como hace el webhook.
  */
 function guardarDatosIA(datos) {
-    initTablas(); // Se asume que initTablas y ESQUEMA_BD existen en Code.gs en un entorno global de GAS
+    configurarBaseDeDatos(); // Se asume que configurarBaseDeDatos y ESQUEMA_BD existen en Code.gs en un entorno global de GAS
     const ss = getSpreadsheet(); // getSpreadsheet() y SHEET_ID declarados en Code.gs
     let resultados = {};
 
