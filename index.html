@@ -1,0 +1,348 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top">
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Tailwind CSS (CDN for quick setup) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['Inter', 'sans-serif'],
+            }
+          }
+        }
+      }
+    </script>
+    <style>
+      /* Smooth transitions */
+      .modal-enter { opacity: 0; transform: scale(0.95); }
+      .modal-enter-active { opacity: 1; transform: scale(1); transition: opacity 200ms, transform 200ms; }
+      .modal-leave { opacity: 1; transform: scale(1); }
+      .modal-leave-active { opacity: 0; transform: scale(0.95); transition: opacity 200ms, transform 200ms; }
+    </style>
+    <title>SGC - Gestión de Contratos</title>
+  </head>
+  <body class="bg-gray-50 text-gray-800 font-sans min-h-screen">
+    
+    <!-- Navbar -->
+    <nav class="bg-indigo-600 shadow-lg">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="flex items-center justify-between h-16">
+          <div class="flex items-center">
+            <span class="text-white font-bold text-xl tracking-tight">SGC | Contratos</span>
+          </div>
+          <div>
+            <button onclick="openModal()" class="bg-white text-indigo-600 hover:bg-gray-100 font-semibold py-2 px-4 rounded-md shadow-sm transition-colors duration-200">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 inline-block mr-1 -mt-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+              </svg>
+              Nuevo Contrato
+            </button>
+          </div>
+        </div>
+      </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      
+      <!-- Stats/Header Area -->
+      <div class="mb-8 flex justify-between items-end">
+        <div>
+          <h1 class="text-3xl font-extrabold text-gray-900 tracking-tight">Directorio de Contratos</h1>
+          <p class="mt-2 text-sm text-gray-500">Administra y da seguimiento a todos los contratos activos e inactivos.</p>
+        </div>
+      </div>
+
+      <!-- Table Container -->
+      <div class="bg-white shadow-sm rounded-xl overflow-hidden border border-gray-200">
+        
+        <!-- Loading State -->
+        <div id="loading" class="p-12 text-center">
+          <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-indigo-500 border-t-transparent mb-4"></div>
+          <p class="text-gray-500 font-medium">Cargando datos desde Google Sheets...</p>
+        </div>
+
+        <!-- Data Table -->
+        <div class="overflow-x-auto hidden" id="contractsTableContainer">
+          <table class="min-w-full divide-y divide-gray-200" id="contractsTable">
+            <thead class="bg-gray-50">
+              <tr>
+                <th scope="col" class="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Detalles del Contrato</th>
+                <th scope="col" class="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Cliente</th>
+                <th scope="col" class="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Vigencia</th>
+                <th scope="col" class="px-6 py-4 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Estado</th>
+                <th scope="col" class="px-6 py-4 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Acciones</th>
+              </tr>
+            </thead>
+            <tbody id="contractsBody" class="bg-white divide-y divide-gray-200">
+              <!-- JS Injected Rows -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+
+    <!-- Modal Form -->
+    <div id="contractModal" class="fixed inset-0 z-50 hidden" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+      <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+        
+        <div class="fixed inset-0 bg-gray-900 bg-opacity-75 transition-opacity" aria-hidden="true" onclick="closeModal()"></div>
+        <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+
+        <div class="inline-block align-bottom bg-white rounded-xl text-left overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg w-full">
+          <div class="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+            <h3 class="text-xl leading-6 font-bold text-gray-900 mb-5" id="modalTitle">Nuevo Contrato</h3>
+            
+            <form id="contractForm" onsubmit="saveContract(event)">
+              <input type="hidden" id="contractId" name="ID">
+              
+              <div class="mb-4">
+                <label for="contractNumero" class="block text-sm font-medium text-gray-700">Número de Contrato</label>
+                <input type="text" id="contractNumero" required class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+              </div>
+
+              <div class="mb-4">
+                <label for="contractCliente" class="block text-sm font-medium text-gray-700">Cliente / Dependencia</label>
+                <input type="text" id="contractCliente" required class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+              </div>
+
+              <div class="mb-4">
+                <label for="contractMonto" class="block text-sm font-medium text-gray-700">Monto del Contrato ($)</label>
+                <div class="mt-1 relative rounded-md shadow-sm">
+                  <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <span class="text-gray-500 sm:text-sm">$</span>
+                  </div>
+                  <input type="number" step="0.01" id="contractMonto" required class="block w-full pl-7 border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" placeholder="0.00">
+                </div>
+              </div>
+
+              <div class="grid grid-cols-2 gap-4 mb-4">
+                <div>
+                  <label for="contractInicio" class="block text-sm font-medium text-gray-700">Fecha de Inicio</label>
+                  <input type="date" id="contractInicio" required class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                </div>
+                <div>
+                  <label for="contractFin" class="block text-sm font-medium text-gray-700">Fecha de Término</label>
+                  <input type="date" id="contractFin" required class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                </div>
+              </div>
+
+              <div class="mb-5">
+                <label for="contractEstado" class="block text-sm font-medium text-gray-700">Estado del Contrato</label>
+                <select id="contractEstado" class="mt-1 block w-full bg-white border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
+                  <option value="Activo">Activo</option>
+                  <option value="Finalizado">Finalizado</option>
+                  <option value="Cancelado">Cancelado</option>
+                </select>
+              </div>
+
+              <div class="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse -mx-6 -mb-4">
+                <button type="submit" id="saveBtn" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-indigo-600 text-base font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:ml-3 sm:w-auto sm:text-sm transition-colors duration-200">
+                  Guardar Contrato
+                </button>
+                <button type="button" onclick="closeModal()" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm transition-colors duration-200">
+                  Cancelar
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Notification Toast -->
+    <div id="toast" class="fixed bottom-5 right-5 z-50 transform transition-all duration-300 translate-y-20 opacity-0">
+      <div class="bg-gray-800 text-white px-6 py-3 rounded-lg shadow-lg flex items-center">
+        <span id="toastMessage">Acción completada</span>
+      </div>
+    </div>
+
+    <!-- Google Apps Script JS Logic -->
+    <script>
+      let currentContracts = [];
+
+      function showToast(message, isError = false) {
+        const toast = document.getElementById('toast');
+        const toastMessage = document.getElementById('toastMessage');
+        toastMessage.innerText = message;
+        toast.firstElementChild.className = isError 
+          ? 'bg-red-600 text-white px-6 py-3 rounded-lg shadow-lg flex items-center'
+          : 'bg-gray-800 text-white px-6 py-3 rounded-lg shadow-lg flex items-center';
+        
+        toast.classList.remove('translate-y-20', 'opacity-0');
+        setTimeout(() => toast.classList.add('translate-y-20', 'opacity-0'), 3000);
+      }
+
+      function loadContracts() {
+        document.getElementById('loading').classList.remove('hidden');
+        document.getElementById('contractsTableContainer').classList.add('hidden');
+        
+        google.script.run
+          .withSuccessHandler(displayContracts)
+          .withFailureHandler(showError)
+          .getContracts();
+      }
+
+      function displayContracts(contracts) {
+        currentContracts = contracts;
+        const tbody = document.getElementById('contractsBody');
+        tbody.innerHTML = '';
+        
+        if (contracts.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="5" class="px-6 py-12 text-center text-gray-500 text-sm">No se encontraron contratos registrados.<br>Haga clic en "Nuevo Contrato" para comenzar.</td></tr>';
+        } else {
+            contracts.forEach(contract => {
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-gray-50 transition-colors duration-150';
+                
+                let statusBadge = '';
+                if (contract.Estado === 'Activo') {
+                  statusBadge = '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">Activo</span>';
+                } else if (contract.Estado === 'Cancelado') {
+                  statusBadge = '<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">Cancelado</span>';
+                } else {
+                  statusBadge = `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">${contract.Estado || 'Desconocido'}</span>`;
+                }
+
+                // Format currency
+                const monto = parseFloat(contract.Monto || 0);
+                const montoFormat = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(monto);
+                
+                // Format dates
+                const formatDate = (dateString) => {
+                  if(!dateString) return '-';
+                  const d = new Date(dateString);
+                  return isNaN(d) ? dateString : d.toLocaleDateString('es-MX', { year: 'numeric', month: 'short', day: 'numeric' });
+                };
+
+                tr.innerHTML = `
+                    <td class="px-6 py-4 whitespace-nowrap">
+                      <div class="flex items-center">
+                        <div class="ml-0">
+                          <div class="text-sm font-semibold text-gray-900">${contract.Numero || 'S/N'}</div>
+                          <div class="text-sm text-gray-500 font-medium">${montoFormat}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                      <div class="text-sm text-gray-900">${contract.Cliente || 'N/A'}</div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      <div><span class="text-gray-400">Inicio:</span> ${formatDate(contract.FechaInicio)}</div>
+                      <div><span class="text-gray-400">Fin:</span> ${formatDate(contract.FechaFin)}</div>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                      ${statusBadge}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                      <button onclick="editContract('${contract.ID}')" class="text-indigo-600 hover:text-indigo-900 mr-4 font-semibold transition-colors">Editar</button>
+                      <button onclick="deleteContract('${contract.ID}')" class="text-red-500 hover:text-red-700 font-semibold transition-colors">Eliminar</button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+        
+        document.getElementById('loading').classList.add('hidden');
+        document.getElementById('contractsTableContainer').classList.remove('hidden');
+      }
+
+      function showError(error) {
+          showToast('Error: ' + error.message, true);
+          document.getElementById('loading').innerHTML = '<div class="text-red-500 font-semibold mb-2">Error de conexión</div><p class="text-sm text-gray-500">Asegúrese de que el ID del Sheet sea correcto y tenga permisos.</p>';
+      }
+
+      const modal = document.getElementById('contractModal');
+
+      function openModal() {
+          document.getElementById('contractForm').reset();
+          document.getElementById('contractId').value = '';
+          document.getElementById('modalTitle').innerText = 'Nuevo Contrato';
+          modal.classList.remove('hidden');
+          modal.querySelector('.inline-block').classList.add('modal-enter-active');
+      }
+
+      function closeModal() {
+          modal.classList.add('hidden');
+      }
+
+      function editContract(id) {
+          const contract = currentContracts.find(c => c.ID === id);
+          if (contract) {
+              document.getElementById('contractId').value = contract.ID || '';
+              document.getElementById('contractNumero').value = contract.Numero || '';
+              document.getElementById('contractCliente').value = contract.Cliente || '';
+              document.getElementById('contractMonto').value = contract.Monto || '';
+              
+              if (contract.FechaInicio) {
+                  const d = new Date(contract.FechaInicio);
+                  if(!isNaN(d)) document.getElementById('contractInicio').value = d.toISOString().split('T')[0];
+              }
+              if (contract.FechaFin) {
+                  const d = new Date(contract.FechaFin);
+                  if(!isNaN(d)) document.getElementById('contractFin').value = d.toISOString().split('T')[0];
+              }
+              
+              document.getElementById('contractEstado').value = contract.Estado || 'Activo';
+              document.getElementById('modalTitle').innerText = 'Editar Contrato';
+              modal.classList.remove('hidden');
+          }
+      }
+
+      function saveContract(event) {
+          event.preventDefault();
+          const btn = document.getElementById('saveBtn');
+          const originalText = btn.innerText;
+          btn.innerHTML = '<svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white inline-block" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Guardando...';
+          btn.disabled = true;
+
+          const data = {
+              ID: document.getElementById('contractId').value,
+              Numero: document.getElementById('contractNumero').value,
+              Cliente: document.getElementById('contractCliente').value,
+              Monto: document.getElementById('contractMonto').value,
+              FechaInicio: document.getElementById('contractInicio').value,
+              FechaFin: document.getElementById('contractFin').value,
+              Estado: document.getElementById('contractEstado').value
+          };
+
+          google.script.run
+            .withSuccessHandler(() => {
+                closeModal();
+                loadContracts();
+                showToast('Contrato guardado correctamente');
+                btn.innerText = originalText;
+                btn.disabled = false;
+            })
+            .withFailureHandler((error) => {
+                showToast('Error al guardar: ' + error.message, true);
+                btn.innerText = originalText;
+                btn.disabled = false;
+            })
+            .saveContract(data);
+      }
+      
+      function deleteContract(id) {
+          if(confirm('¿Está seguro de que desea eliminar este contrato? Esta acción no se puede deshacer.')) {
+              google.script.run
+                .withSuccessHandler(() => {
+                  loadContracts();
+                  showToast('Contrato eliminado');
+                })
+                .withFailureHandler((error) => showToast('Error al eliminar: ' + error.message, true))
+                .deleteContract(id);
+          }
+      }
+
+      // Initialize
+      window.onload = loadContracts;
+    </script>
+  </body>
+</html>
