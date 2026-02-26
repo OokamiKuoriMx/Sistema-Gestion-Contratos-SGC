@@ -1,4 +1,11 @@
-var SHEET_ID = 'TU_ID_DE_HOJA_DE_CALCULO_AQUI'; // Reemplazar con el ID real del Google Sheet
+var SHEET_ID = 'TU_ID_DE_HOJA_DE_CALCULO_AQUI'; // Opcional si el script está vinculado a la hoja
+
+function getSpreadsheet() {
+    if (SpreadsheetApp.getActiveSpreadsheet()) {
+        return SpreadsheetApp.getActiveSpreadsheet();
+    }
+    return SpreadsheetApp.openById(SHEET_ID);
+}
 
 // Esquema Relacional de Base de Datos para extracción IA
 var ESQUEMA_BD = {
@@ -20,7 +27,7 @@ function doGet() {
  * Función inicializadora: Crea las 4 pestañas de la BD relacional si no existen
  */
 function initTablas() {
-    const ss = SpreadsheetApp.openById(SHEET_ID);
+    const ss = getSpreadsheet();
     for (const tabla in ESQUEMA_BD) {
         let sheet = ss.getSheetByName(tabla);
         if (!sheet) {
@@ -51,7 +58,7 @@ function doPost(e) {
 
         if (payload.accion === "importar_datos" && payload.datos) {
             initTablas();
-            const ss = SpreadsheetApp.openById(SHEET_ID);
+            const ss = getSpreadsheet();
             let resultados = {};
 
             const tablas = Object.keys(ESQUEMA_BD);
@@ -107,7 +114,7 @@ function errorResponse(msg) {
 function getContracts() {
     try {
         initTablas();
-        const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName('Contratos');
+        const sheet = getSpreadsheet().getSheetByName('Contratos');
         const data = sheet.getDataRange().getValues();
         if (data.length <= 1) return [];
 
@@ -130,7 +137,7 @@ function getContracts() {
 function saveContract(contractData) {
     try {
         initTablas();
-        const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName('Contratos');
+        const sheet = getSpreadsheet().getSheetByName('Contratos');
         const headers = ESQUEMA_BD['Contratos'];
 
         // Si no tiene ID, es registro nuevo
@@ -161,7 +168,7 @@ function saveContract(contractData) {
 
 function deleteContract(id) {
     try {
-        const sheet = SpreadsheetApp.openById(SHEET_ID).getSheetByName('Contratos');
+        const sheet = getSpreadsheet().getSheetByName('Contratos');
         const data = sheet.getDataRange().getValues();
         const headers = ESQUEMA_BD['Contratos'];
         const idIndex = headers.indexOf('ID_Contrato');

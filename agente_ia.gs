@@ -115,7 +115,7 @@ function processDocumentWithAI(base64Data, mimeType) {
  */
 function guardarDatosIA(datos) {
     initTablas(); // Se asume que initTablas y ESQUEMA_BD existen en Code.gs en un entorno global de GAS
-    const ss = SpreadsheetApp.openById(SHEET_ID); // SHEET_ID también declarado en Code.gs
+    const ss = getSpreadsheet(); // getSpreadsheet() y SHEET_ID declarados en Code.gs
     let resultados = {};
 
     const tablas = Object.keys(ESQUEMA_BD);
