@@ -1,7 +1,7 @@
-const SHEET_ID = 'TU_ID_DE_HOJA_DE_CALCULO_AQUI'; // Reemplazar con el ID real del Google Sheet
+var SHEET_ID = 'TU_ID_DE_HOJA_DE_CALCULO_AQUI'; // Reemplazar con el ID real del Google Sheet
 
 // Esquema Relacional de Base de Datos para extracción IA
-const ESQUEMA_BD = {
+var ESQUEMA_BD = {
     'Convenios': ['ID_Convenio', 'Numero_Acuerdo', 'Monto_Apoyo', 'Vigencia_Fin', 'Objeto_Programa', 'Proyectos_Asociados'],
     'Contratos': ['ID_Contrato', 'Numero_Contrato', 'ID_Convenio_Vinculado', 'Contratista', 'RFC_Contratista', 'Objeto_Contrato', 'Monto_Sin_IVA', 'Monto_Total_Con_IVA', 'Fecha_Inicio', 'Fecha_Fin'],
     'Programa_Ejecucion': ['ID_Programa', 'ID_Contrato', 'Clave_Concepto_Periodo', 'Descripcion', 'Unidad', 'Cantidad', 'Precio_Unitario', 'Importe_Total'],

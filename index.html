@@ -114,7 +114,16 @@
             <span class="text-inst-lightGold text-xs uppercase tracking-widest font-medium">Sistema Institucional</span>
           </div>
         </div>
-        <div>
+        <div class="flex items-center gap-3">
+          <button onclick="openUploadModal()"
+            class="bg-inst-gold text-white hover:bg-inst-burgundy font-semibold py-2.5 px-5 rounded-md shadow transition-all duration-300 transform hover:-translate-y-0.5 flex items-center gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24"
+              stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+            </svg>
+            <span>Subir Documento (IA)</span>
+          </button>
           <button onclick="openModal()"
             class="bg-white text-inst-burgundy hover:bg-inst-lightGold hover:text-inst-darkGreen font-semibold py-2.5 px-5 rounded-md shadow transition-all duration-300 transform hover:-translate-y-0.5 flex items-center gap-2">
             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24"
@@ -322,6 +331,61 @@
               </button>
             </div>
           </form>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal Upload IA -->
+  <div id="uploadModal" class="fixed inset-0 z-50 hidden" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+    <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+      <div class="fixed inset-0 bg-inst-dark bg-opacity-60 backdrop-blur-sm transition-opacity" aria-hidden="true"
+        onclick="closeUploadModal()"></div>
+      <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+      <div
+        class="inline-block align-bottom bg-white rounded-xl text-left overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:align-middle sm:max-w-xl w-full border border-gray-100">
+        <div class="h-2 w-full bg-inst-gold"></div>
+        <div class="bg-white px-6 pt-6 pb-6 sm:p-8 sm:pb-6">
+          <h3
+            class="text-2xl font-semibold text-inst-burgundy mb-6 flex items-center gap-3 border-b border-gray-100 pb-4">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-inst-gold" fill="none" viewBox="0 0 24 24"
+              stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+            </svg>
+            <span>Procesamiento Inteligente (IA)</span>
+          </h3>
+          <div class="space-y-5">
+            <p class="text-sm text-inst-gray">Sube un contrato, o documento en PDF/DOCX para que el agente extraiga
+              automáticamente la información y alimente la base de datos.</p>
+            <div
+              class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md hover:border-inst-gold transition-colors">
+              <div class="space-y-1 text-center">
+                <svg class="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48"
+                  aria-hidden="true">
+                  <path
+                    d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02"
+                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+                <div class="flex text-sm text-gray-600 justify-center">
+                  <label for="fileUploadInput"
+                    class="relative cursor-pointer bg-white rounded-md font-medium text-inst-burgundy hover:text-inst-burgundyLight focus-within:outline-none focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-inst-burgundy">
+                    <span>Seleccionar archivo</span>
+                    <input id="fileUploadInput" name="fileUploadInput" type="file" class="sr-only"
+                      accept=".pdf,.doc,.docx" onchange="updateFileName(this)">
+                  </label>
+                </div>
+                <p class="text-xs text-gray-500" id="fileNameDisplay">PDF, DOC, DOCX</p>
+              </div>
+            </div>
+          </div>
+          <div class="mt-8 pt-5 border-t border-gray-100 flex justify-end gap-3">
+            <button type="button" onclick="closeUploadModal()"
+              class="w-full sm:w-auto inline-flex justify-center rounded-md border border-gray-300 px-5 py-2.5 bg-white text-sm font-semibold text-inst-dark hover:bg-gray-50 hover:text-inst-burgundy transition-colors duration-200">Cancelar</button>
+            <button type="button" id="uploadBtn" onclick="processAIAttachment()"
+              class="w-full sm:w-auto inline-flex justify-center rounded-md border border-transparent shadow-sm px-6 py-2.5 bg-inst-gold text-sm font-semibold text-white hover:bg-inst-burgundy focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-inst-burgundy transition-colors duration-200">Extraer
+              con IA</button>
+          </div>
         </div>
       </div>
     </div>
@@ -537,6 +601,66 @@
           .withFailureHandler((error) => showToast('Imposible eliminar registro: ' + error.message, true))
           .deleteContract(id);
       }
+    }
+
+    // Funciones IA Upload Modals
+    function openUploadModal() {
+      document.getElementById('fileUploadInput').value = '';
+      document.getElementById('fileNameDisplay').innerText = 'PDF, DOC, DOCX';
+      const m = document.getElementById('uploadModal');
+      m.classList.remove('hidden');
+      m.querySelector('.inline-block').classList.add('modal-enter-active');
+    }
+
+    function closeUploadModal() {
+      document.getElementById('uploadModal').classList.add('hidden');
+    }
+
+    function updateFileName(input) {
+      if (input.files && input.files[0]) {
+        document.getElementById('fileNameDisplay').innerText = input.files[0].name;
+      } else {
+        document.getElementById('fileNameDisplay').innerText = 'PDF, DOC, DOCX';
+      }
+    }
+
+    function processAIAttachment() {
+      const fileInput = document.getElementById('fileUploadInput');
+      const file = fileInput.files[0];
+      if (!file) {
+        showToast('Selecciona un documento primero', true);
+        return;
+      }
+
+      const btn = document.getElementById('uploadBtn');
+      const originalContent = btn.innerHTML;
+      btn.innerHTML = '<svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white inline-block" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Analizando con Gemini...';
+      btn.disabled = true;
+
+      const reader = new FileReader();
+      reader.onload = function (e) {
+        const base64Data = e.target.result;
+
+        google.script.run
+          .withSuccessHandler(res => {
+            if (res.success) {
+              showToast('Extracción IA exitosa. Refrescando datos.');
+              loadContracts();
+              closeUploadModal();
+            } else {
+              showToast('Fallo IA: ' + res.message, true);
+            }
+            btn.innerHTML = originalContent;
+            btn.disabled = false;
+          })
+          .withFailureHandler(err => {
+            showToast('Imposible conectar: ' + err.message, true);
+            btn.innerHTML = originalContent;
+            btn.disabled = false;
+          })
+          .processDocumentWithAI(base64Data, file.type);
+      }
+      reader.readAsDataURL(file);
     }
 
     // Initialize
