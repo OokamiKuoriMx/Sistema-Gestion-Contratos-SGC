@@ -5,7 +5,7 @@ La aplicación está diseñada para usar una hoja de cálculo (Google Sheet) com
 
 ## Estructura del Proyecto
 
-- `Code.js`: Lógica de backend (API) para Apps Script. Contiene las funciones `doGet()`, `getContracts()`, `saveContract()`, y `deleteContract()`.
+- `Code.gs`: Lógica de backend (API) para Apps Script. Contiene las funciones `doGet()`, `getContracts()`, `saveContract()`, y `deleteContract()`.
 - `index.html`: Interfaz de usuario servida a través de la Web App. Utiliza Tailwind CSS (vía CDN) y hace llamadas al backend usando `google.script.run`.
 - `appsscript.json`: Manifiesto de la aplicación de Google Apps Script.
 
@@ -14,7 +14,7 @@ La aplicación está diseñada para usar una hoja de cálculo (Google Sheet) com
 ### 1. Configurar la Base de Datos (Google Sheet)
 1. Crea un nuevo Google Sheet.
 2. Copia el **ID de la Hoja de Cálculo** desde la URL (la cadena larga entre `/d/` y `/edit`).
-3. Abre el archivo `Code.js`.
+3. Abre el archivo `Code.gs`.
 4. Reemplaza el valor de `SHEET_ID` en la primera línea con tu ID de Hoja de Cálculo copiado:
    ```javascript
    const SHEET_ID = 'TU_ID_AQUI'; // <- Pega tu ID de Google Sheets aquí
@@ -26,7 +26,7 @@ La aplicación está diseñada para usar una hoja de cálculo (Google Sheet) com
 2. Si lo haces manualmente:
    - Ve a [script.google.com](https://script.google.com/).
    - Crea un "Nuevo proyecto".
-   - Borra cualquier archivo existente y pega el contenido de `Code.js` y crea un archivo `index.html` con su contenido correspondiente.
+   - Borra cualquier archivo existente y pega el contenido de `Code.gs` y crea un archivo `index.html` con su contenido correspondiente.
    - Asegúrate de actualizar el archivo `appsscript.json` (mostrar manifiesto en configuración del editor).
 3. Para publicar:
    - Presiona el botón **Implementar** > **Nueva Implementación**.
