@@ -34,6 +34,11 @@ function doGet() {
         .addMetaTag('viewport', 'width=device-width, initial-scale=1');
 }
 
+// Permite incluir archivos HTML modulares dentro de index.html
+function include(filename) {
+    return HtmlService.createHtmlOutputFromFile(filename).getContent();
+}
+
 /**
  * Función inicializadora: Crea las 5 pestañas de la BD relacional si no existen y elimina deprecadas
  */

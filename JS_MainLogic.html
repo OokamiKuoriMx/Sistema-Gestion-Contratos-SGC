@@ -1,0 +1,1668 @@
+<script>
+// System State
+    let SCHEMA = {};
+    let DB = {}; // Holds cached table data e.g. { Contratos: [], Contratistas: [] }
+    let currentView = 'dashboard';
+    let activeTableName = 'Contratos'; // For Universal Explorer
+
+    // Form State
+    let isEditing = false;
+    let editPkField = null;
+    let editPkValue = null;
+    let currentContextualTable = null; // Stores target table for AI or form creation
+
+    // --- UTILS ---
+    const formatMoney = val => new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(parseFloat(val) || 0);
+    const formatDate = val => {
+      if (!val) return '-';
+      const d = new Date(val);
+      return isNaN(d) ? val : d.toLocaleDateString('es-MX', { year: 'numeric', month: 'short', day: '2-digit' });
+    };
+
+    function showLoader(text = "Cargando...") {
+      document.getElementById('loaderMsg').innerText = text;
+      document.getElementById('globalLoader').style.display = 'flex';
+      setTimeout(() => document.getElementById('globalLoader').classList.remove('opacity-0'), 10);
+    }
+    function hideLoader() {
+      document.getElementById('globalLoader').classList.add('opacity-0');
+      setTimeout(() => document.getElementById('globalLoader').style.display = 'none', 200);
+    }
+
+    function toast(msg, type = "success") {
+      const t = document.getElementById('toast');
+      document.getElementById('toastMsg').innerText = msg;
+      if (type === 'error') {
+        t.className = "fixed top-6 right-6 z-[200] transform transition-all duration-300 translate-x-0 opacity-100 bg-white shadow-xl rounded-lg border-l-4 flex overflow-hidden border-rose-500";
+        document.getElementById('toastIcon').innerHTML = '<svg class="w-5 h-5 text-rose-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" /></svg>';
+      } else {
+        t.className = "fixed top-6 right-6 z-[200] transform transition-all duration-300 translate-x-0 opacity-100 bg-white shadow-xl rounded-lg border-l-4 flex overflow-hidden border-green-500";
+        document.getElementById('toastIcon').innerHTML = '<svg class="w-5 h-5 text-green-500" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>';
+      }
+      setTimeout(() => { t.classList.add('translate-x-10', 'opacity-0'); t.classList.remove('translate-x-0', 'opacity-100'); }, 4000);
+    }
+
+    // --- ROUTER ---
+    function navigate(viewId) {
+      showLoader("Cargando módulo...");
+
+      // Yield thread to paint loader
+      setTimeout(() => {
+        document.querySelectorAll('.view-section').forEach(el => {
+          el.classList.remove('active');
+          el.classList.add('hidden');
+        });
+
+        const targetView = document.getElementById(`view-${viewId}`);
+        currentView = viewId;
+
+        // Active state on Sidebar
+        document.querySelectorAll('.nav-btn').forEach(btn => {
+          btn.classList.remove('bg-inst-sidebarHover', 'text-white');
+          btn.classList.add('text-gray-400');
+        });
+        const activeBtn = document.getElementById(`nav-${viewId}`);
+        if (activeBtn) {
+          activeBtn.classList.add('bg-inst-sidebarHover', 'text-white');
+          activeBtn.classList.remove('text-gray-400');
+        } else if (viewId === 'expediente') {
+          const projBtn = document.getElementById(`nav-proyectos`);
+          if (projBtn) {
+            projBtn.classList.add('bg-inst-sidebarHover', 'text-white');
+            projBtn.classList.remove('text-gray-400');
+          }
+        }
+
+        // Update Visuals based on context
+        if (viewId === 'dashboard') {
+          document.getElementById('headerTitle').innerText = "Visión General (Dashboard)";
+          buildDashboard();
+        } else if (viewId === 'proyectos') {
+          document.getElementById('headerTitle').innerText = "Expedientes de Proyectos";
+          buildProjectsGrid();
+        } else if (viewId === 'explorer') {
+          document.getElementById('headerTitle').innerText = "Motor DB Inteligente";
+          if (!SCHEMA[activeTableName]) activeTableName = Object.keys(SCHEMA)[0];
+          buildExplorerTabs();
+          loadTableData(activeTableName);
+        } else if (viewId === 'expediente') {
+          document.getElementById('headerTitle').innerText = "Expediente de Obra";
+        }
+
+        targetView.classList.remove('hidden');
+        targetView.classList.add('active');
+        hideLoader();
+      }, 50);
+    }
+
+    // --- ERROR PROXY & DEBUG MODE (Native Console) ---
+    window.onerror = (msg, url, lineNo, columnNo, error) => {
+      console.error("[Runtime Error]", msg, `at ${url}:${lineNo}:${columnNo}`, error);
+      toast(`Error de UI: ${msg}`, 'error');
+      return false;
+    };
+    window.onunhandledrejection = (event) => {
+      console.error("[Promise Rejection]", event.reason);
+      toast(`Error de Promesa: ${event.reason}`, 'error');
+    };
+
+    // --- INITIALIZE SPA ---
+    window.onload = function () {
+      console.log("[INICIO] window.onload disparado");
+      setTimeout(() => {
+        document.getElementById('dbStatusBadge').innerHTML = '<span class="inline-flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span> Sincronizando Esquema...</span>';
+
+        console.log("[INICIO] Llamando a google.script.run.getSchema()");
+        if (typeof google === 'undefined' || !google.script || !google.script.run) {
+          console.error("[FATAL] google.script.run NO ESTÁ DISPONIBLE. ¿Se está ejecutando fuera del entorno de Apps Script?");
+        } else {
+          google.script.run
+            .withSuccessHandler(schema => {
+              console.log("[ÉXITO] Esquema recibido del servidor:", schema);
+              SCHEMA = schema;
+              document.getElementById('dbStatusBadge').innerHTML = '<span class="inline-flex items-center gap-1.5"><span class="w-2 h-2 rounded-full bg-green-500"></span> DB en Línea</span>';
+              // Pre-fetch Contratos and Contratistas for the Dashboard
+              preloadData();
+            })
+            .withFailureHandler(e => {
+              console.error("[ERROR GET_SCHEMA] Falló la obtención del esquema de BD:", e);
+              toast(e.message, 'error');
+            })
+            .getSchema();
+        }
+      }, 100);
+    };
+
+    async function preloadData() {
+      console.log("[PRELOAD] Iniciando obtención de toda la BD...");
+      showLoader("Actualizando datos...");
+
+      google.script.run
+        .withSuccessHandler(response => {
+          let payload = typeof response === 'string' ? JSON.parse(response) : response;
+          console.log("[ÉXITO PRELOAD] Toda la base de datos descargada sin bloqueos concurrentes.");
+          Object.keys(payload).forEach(tableName => {
+            DB[tableName] = payload[tableName];
+          });
+
+          hideLoader();
+
+          console.log("[INICIO SPA] Navegación inicial a vista:", currentView);
+          if (currentView === 'expediente' && window.currentExpedienteId) {
+            loadExpediente(window.currentExpedienteId);
+          } else if (currentView === 'explorer') {
+            loadTableData(activeTableName);
+          } else {
+            navigate(currentView || 'dashboard');
+          }
+        })
+        .withFailureHandler(err => {
+          console.error("[FATAL PRELOAD] Error global recibiendo BD:", err);
+          hideLoader();
+          toast("Error cargando base de datos: " + err.message, "error");
+        })
+        .dbSelectAll();
+    }
+
+    // --- VIEW LOGIC: DASHBOARD ---
+    function buildDashboard() {
+      const contratos = DB['Contratos'] || [];
+      const contratistas = DB['Contratistas'] || [];
+
+      document.getElementById('kpiContratos').innerText = contratos.length;
+      document.getElementById('kpiContratistas').innerText = contratistas.length;
+
+      const totalMonto = contratos.reduce((sum, c) => sum + (parseFloat(c.Monto_Total_Con_IVA) || 0), 0);
+      document.getElementById('kpiMonto').innerText = formatMoney(totalMonto);
+
+      const tbody = document.getElementById('dashboardRecentBody');
+      tbody.innerHTML = '';
+
+      if (contratos.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="4" class="px-6 py-10 text-center text-gray-400">Sin proyectos registrados.</td></tr>`;
+      } else {
+        // Tomamos los últimos 5 insertados (asumiendo inserción apendicular)
+        const recent = [...contratos].reverse().slice(0, 5);
+        recent.forEach(c => {
+          const emp = contratistas.find(x => x.ID_Contratista == c.ID_Contratista) || { Razon_Social: c.ID_Contratista || 'S/D' };
+          tbody.innerHTML += `
+                 <tr class="hover:bg-gray-50 group">
+                    <td class="px-6 py-4 font-semibold">
+                      <button onclick="loadExpediente('${c.ID_Contrato}')" class="flex items-center text-inst-accent hover:text-inst-accentLight transition-colors text-left text-sm group-hover:underline">
+                        <span class="bg-inst-accent/10 text-inst-accent px-2 py-1 rounded text-xs mr-2 no-underline">DOC</span>
+                        ${c.Numero_Contrato || 'S/N'}
+                      </button>
+                    </td>
+                    <td class="px-6 py-4">${emp.Razon_Social}</td>
+                    <td class="px-6 py-4 text-right font-medium text-gray-900">${formatMoney(c.Monto_Total_Con_IVA)}</td>
+                    <td class="px-6 py-4 text-center text-gray-500 text-xs">${formatDate(c.Fecha_Inicio_Obra)} - ${formatDate(c.Fecha_Fin_Obra)}</td>
+                 </tr>
+               `;
+        });
+      }
+    }
+
+    // --- VIEW LOGIC: PROYECTOS (CARDS) ---
+    function buildProjectsGrid() {
+      const contratos = DB['Contratos'] || [];
+      const contratistas = DB['Contratistas'] || [];
+      const grid = document.getElementById('projectsGrid');
+      grid.innerHTML = '';
+
+      if (contratos.length === 0) {
+        grid.innerHTML = `<div class="col-span-full py-20 text-center text-gray-400 flex flex-col items-center"><svg class="w-12 h-12 mb-3 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>No hay contratos capturados. Utilice el botón superior.</div>`;
+        return;
+      }
+
+      contratos.forEach(c => {
+        const emp = contratistas.find(x => x.ID_Contratista == c.ID_Contratista);
+        const rz = emp ? emp.Razon_Social : (c.ID_Contratista || 'Empresa No Asignada');
+
+        const estado = c.Estado || 'POR INICIAR';
+        let badgeClass = 'bg-gray-100 text-gray-800 border-gray-200';
+        if (estado === 'VIGENTE') badgeClass = 'bg-green-100 text-green-800 border-green-200';
+        else if (estado === 'CIERRE ADMINISTRATIVO') badgeClass = 'bg-amber-100 text-amber-800 border-amber-200';
+        else if (estado === 'FINIQUITADO') badgeClass = 'bg-blue-100 text-blue-800 border-blue-200';
+        else if (estado === 'PROGRAMADO') badgeClass = 'bg-purple-100 text-purple-800 border-purple-200';
+
+        grid.innerHTML += `
+             <div class="bg-white rounded-xl shadow-soft border border-gray-100 p-5 flex flex-col hover:shadow-md transition-shadow relative overflow-hidden group">
+                <div class="h-1 w-full bg-inst-accent absolute top-0 left-0"></div>
+                <div class="flex justify-between items-start mb-4">
+                   <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold border ${badgeClass}">
+                     ${estado}
+                   </span>
+                   <button onclick="editModalContextual('Contratos', '${c.ID_Contrato}')" class="text-gray-400 hover:text-inst-accent transition-colors"><svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg></button>
+                </div>
+                
+                <h4 class="text-lg font-bold text-inst-textPrimary mb-1 truncate" title="${c.Numero_Contrato}">${c.Numero_Contrato || 'Sin Número'}</h4>
+                <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-4 truncate" title="${rz}">${rz}</p>
+                
+                <p class="text-sm text-gray-600 line-clamp-2 mb-6 flex-1">${c.Objeto_Contrato || 'Sin objeto de proyecto en registro.'}</p>
+                
+                <div class="mt-auto border-t border-gray-100 pt-4 flex items-center justify-between">
+                   <div class="flex items-center gap-1.5">
+                     <button onclick="loadExpediente('${c.ID_Contrato}')" class="bg-gray-50 hover:bg-inst-accent hover:text-white text-gray-700 w-9 h-9 flex items-center justify-center rounded-lg transition-colors border border-gray-200" title="Ver Expediente Proyecto">
+                       <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l7-7m-7 7h18" /></svg>
+                     </button>
+                     <button onclick="deleteRecordCascade('Contratos', '${c.ID_Contrato}')" class="bg-red-50 hover:bg-red-600 text-red-600 hover:text-white font-bold text-xs uppercase tracking-wider px-3 h-9 rounded-lg transition-colors border border-red-200 hover:border-transparent flex items-center gap-1 shadow-sm">
+                       Eliminar
+                     </button>
+                   </div>
+                   <div class="text-right">
+                     <span class="block text-xs text-gray-500 mb-0.5">Monto Total</span>
+                     <span class="font-bold text-inst-textPrimary">${formatMoney(c.Monto_Total_Con_IVA)}</span>
+                   </div>
+                </div>
+             </div>
+           `;
+      });
+    }
+
+    // --- VIEW LOGIC: EXPEDIENTE TABS ---
+    function switchExpedienteTab(tabId) {
+      document.querySelectorAll('.exp-tab-btn').forEach(btn => {
+        btn.classList.remove('active', 'border-inst-accent', 'text-inst-accent');
+        btn.classList.add('border-transparent', 'text-gray-500');
+      });
+      document.querySelectorAll('.exp-tab-content').forEach(cont => {
+        cont.classList.add('hidden');
+        cont.classList.remove('flex', 'active');
+      });
+
+      const activeBtn = document.getElementById(`btnTab${tabId.charAt(0).toUpperCase() + tabId.slice(1)}`);
+      if (activeBtn) {
+        activeBtn.classList.add('active', 'border-inst-accent', 'text-inst-accent');
+        activeBtn.classList.remove('border-transparent', 'text-gray-500');
+      }
+
+      const activeTab = document.getElementById(`tab-exp-${tabId}`);
+      if (activeTab) {
+        activeTab.classList.remove('hidden');
+        activeTab.classList.add(tabId === 'catalogo' ? 'flex' : 'flex'); // Tailwind flex utilities
+        setTimeout(() => activeTab.classList.add('active'), 10);
+      }
+    }
+
+    // --- VIEW LOGIC: EXPEDIENTE DE OBRA (DRILL-DOWN) ---
+    function loadExpediente(contratoId) {
+      if (!DB['Contratos'] || !DB['Estimaciones']) {
+        return toast("Base de datos no sincronizada", "error");
+      }
+
+      const contrato = DB['Contratos'].find(x => x.ID_Contrato == contratoId);
+      if (!contrato) return toast("Contrato no localizado en caché", "error");
+
+      // 1. Set Header Context
+      document.getElementById('expTitle').innerText = `Expediente: ${contrato.Numero_Contrato || 'S/N'}`;
+
+      const badge = document.getElementById('expStatusBadge');
+      const estado = contrato.Estado || 'POR INICIAR';
+      badge.innerText = estado;
+      badge.classList.remove('hidden');
+
+      let badgeClass = 'bg-gray-100 text-gray-800 border-gray-200';
+      if (estado === 'VIGENTE') badgeClass = 'bg-green-100 text-green-800 border-green-200';
+      else if (estado === 'CIERRE ADMINISTRATIVO') badgeClass = 'bg-amber-100 text-amber-800 border-amber-200';
+      else if (estado === 'FINIQUITADO') badgeClass = 'bg-blue-100 text-blue-800 border-blue-200';
+      else if (estado === 'PROGRAMADO') badgeClass = 'bg-purple-100 text-purple-800 border-purple-200';
+
+      badge.className = `hidden md:inline-flex items-center px-3 py-1 rounded-full text-xs font-bold border whitespace-nowrap ${badgeClass}`;
+
+      switchExpedienteTab('datos'); // Reset view to Datos Generales
+
+      // 1.5 Render Datos Generales
+      const emp = DB['Contratistas'].find(x => x.ID_Contratista == contrato.ID_Contratista) || {};
+      const dgContainer = document.getElementById('expDatosContainer');
+      if (!dgContainer) return console.error("Elemento 'expDatosContainer' no encontrado");
+
+      let sharepointLinkHTML = '';
+      if (contrato.Link_Sharepoint) {
+        sharepointLinkHTML = `
+            <a href="${contrato.Link_Sharepoint}" target="_blank" 
+              class="text-xs font-bold bg-blue-50 text-blue-600 border border-blue-200 hover:bg-blue-600 hover:text-white transition-all px-3 py-1.5 rounded-lg flex items-center gap-1.5 shadow-sm">
+              <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+              Ir a SharePoint
+            </a>
+          `;
+      }
+
+      dgContainer.innerHTML = `
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 flex flex-col gap-4">
+            <div class="flex justify-between items-center border-b border-gray-100 pb-2">
+              <h4 class="text-sm font-bold text-inst-accent uppercase tracking-wider">Información de la Obra</h4>
+              <div class="flex gap-2">
+                ${sharepointLinkHTML}
+                <button onclick="editModalContextual('Contratos', '${contrato.ID_Contrato}')" 
+                  class="text-xs font-bold text-gray-500 border border-gray-200 hover:border-inst-accent hover:text-inst-accent transition-colors px-3 py-1.5 rounded-lg flex items-center gap-1.5 bg-gray-50 hover:bg-white shadow-sm">
+                  <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                  Editar
+                </button>
+              </div>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+               <div><span class="block text-xs text-gray-500 mb-1">Objeto del Contrato</span><p class="text-sm font-medium text-gray-900 leading-relaxed">${contrato.Objeto_Contrato || 'No especificado'}</p></div>
+               <div><span class="block text-xs text-gray-500 mb-1">Monto (Con IVA)</span><p class="text-lg font-black text-inst-textPrimary">${formatMoney(contrato.Monto_Total_Con_IVA)}</p></div>
+               <div><span class="block text-xs text-gray-500 mb-1">Fecha Firma</span><p class="text-sm font-medium text-gray-900">${formatDate(contrato.Fecha_Firma)}</p></div>
+               <div><span class="block text-xs text-gray-500 mb-1">Plazo de Ejecución</span><p class="text-sm font-medium text-gray-900">${formatDate(contrato.Fecha_Inicio_Obra)} al ${formatDate(contrato.Fecha_Fin_Obra)}</p></div>
+            </div>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 flex flex-col gap-4">
+           <div class="flex justify-between items-center border-b border-gray-100 pb-2">
+             <h4 class="text-sm font-bold text-inst-gold uppercase tracking-wider">Empresa Contratista</h4>
+             <button onclick="editModalContextual('Contratistas', '${emp.ID_Contratista}')" class="text-xs font-bold text-gray-500 border border-gray-200 hover:border-inst-gold hover:text-inst-gold transition-colors px-3 py-1.5 rounded-lg flex items-center gap-1.5 bg-gray-50 hover:bg-white shadow-sm">
+               <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+               Editar Contratista
+             </button>
+           </div>
+           <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div class="md:col-span-2"><span class="block text-xs text-gray-500 mb-1">Razón Social</span><p class="text-lg font-black text-gray-900">${emp.Razon_Social || 'N/A'}</p></div>
+              <div><span class="block text-xs text-gray-500 mb-1">RFC</span><p class="text-sm font-medium text-gray-900">${emp.RFC || 'N/A'}</p></div>
+              <div><span class="block text-xs text-gray-500 mb-1">Cuenta CLABE</span><p class="text-sm font-medium text-gray-900">${emp.Cuenta_Clabe || 'N/A'}</p></div>
+              <div class="md:col-span-2"><span class="block text-xs text-gray-500 mb-1">Domicilio Fiscal</span><p class="text-sm font-medium text-gray-900 truncate" title="${emp.Domicilio_Fiscal || ''}">${emp.Domicilio_Fiscal || 'N/A'}</p></div>
+           </div>
+        </div>
+      `;
+
+      // 2. Compute Financials
+      const montoTotal = parseFloat(contrato.Monto_Total_Con_IVA) || 0;
+      let totalPagado = 0;
+
+      // 2.A Load Programa de Ejecución (linked via Concepts) - MATRIX VIEW
+      const progBody = document.getElementById('tblProgramaBody');
+      const progHead = document.getElementById('tblProgramaHead');
+      const contractConcepts = (DB['Catalogo_Conceptos'] || []).filter(c => c.ID_Contrato == contratoId);
+      const conceptIds = contractConcepts.map(c => c.ID_Concepto);
+      const programa = (DB['Programa_Ejecucion'] || []).filter(p => conceptIds.includes(p.ID_Concepto));
+
+      if (progBody) progBody.innerHTML = '';
+
+      if (programa.length === 0) {
+        if (progHead) progHead.innerHTML = '<th class="px-4 py-2">No. Programa</th><th class="px-4 py-2">Periodo</th><th class="px-4 py-2 text-right">Monto Prog.</th><th class="px-4 py-2 text-right">Avance (%)</th>';
+        if (progBody) progBody.innerHTML = `<tr><td colspan="4" class="px-6 py-10 text-center text-gray-400">No hay programa de ejecución cargado.</td></tr>`;
+      } else {
+        // 1. Identify unique periods across all concepts
+        const periodsSet = new Set();
+        programa.forEach(p => {
+          const perStr = `${formatDate(p.Fecha_Inicio)} al ${formatDate(p.Fecha_Fin)}`;
+          periodsSet.add(perStr);
+        });
+
+        // Convert set to array and sort chronologically based on start date
+        const sortedPeriods = Array.from(periodsSet).sort((a, b) => {
+          const dateA = new Date(a.split(' al ')[0]);
+          const dateB = new Date(b.split(' al ')[0]);
+          return dateA - dateB;
+        });
+
+        // 2. Build Dynamic Table Header
+        let headHTML = '<th class="px-4 py-3 sticky left-0 bg-gray-100 z-20 border-r border-gray-200 min-w-[200px]">Concepto / Descripción</th>';
+        headHTML += '<th class="px-4 py-3 text-right bg-gray-50 text-inst-accent font-bold">% Peso</th>';
+        sortedPeriods.forEach(per => {
+          headHTML += `<th class="px-4 py-3 text-center border-r border-gray-200 min-w-[150px] shadow-sm">${per}</th>`;
+        });
+        headHTML += '<th class="px-4 py-3 text-right bg-gray-200 font-black text-inst-textPrimary">Total Concepto</th>';
+        if (progHead) progHead.innerHTML = headHTML;
+
+        // 3. Build Body Rows (One per Concept)
+        let bodyHTML = '';
+        const colTotals = new Array(sortedPeriods.length).fill(0);
+        let grandTotal = 0;
+
+        contractConcepts.forEach(c => {
+          let rowTotal = 0;
+          // Fixed First Column (Clave + Desc)
+          let rowHTML = `
+            <tr class="hover:bg-gray-50 transition-colors">
+              <td class="px-4 py-3 sticky left-0 bg-white z-10 border-r border-gray-100 font-medium text-xs shadow-sm">
+                <span class="text-inst-accent font-bold">${c.Clave}</span><br>
+                <div class="text-[10px] text-gray-500 truncate max-w-[250px]" title="${c.Descripcion}">${c.Descripcion}</div>
+              </td>
+          `;
+
+          // Calculate Row Total first for percentage reference
+          sortedPeriods.forEach(per => {
+            const entries = programa.filter(p => p.ID_Concepto == c.ID_Concepto && `${formatDate(p.Fecha_Inicio)} al ${formatDate(p.Fecha_Fin)}` === per);
+            rowTotal += entries.reduce((sum, item) => sum + (parseFloat(item.Monto_Programado) || 0), 0);
+          });
+
+          // % Peso Column (Concept cost vs Contract Total)
+          const pctPeso = montoTotal > 0 ? (rowTotal / (montoTotal / 1.16 /* Approx before IVA if needed, but using total is safer */)) : 0; // Just as reference
+          const pctLabel = montoTotal > 0 ? ((rowTotal / montoTotal) * 100).toFixed(2) + '%' : '-';
+          rowHTML += '<td class="px-4 py-3 text-right text-[10px] font-bold text-gray-400 bg-gray-50">' + pctLabel + '</td>';
+
+          // Dynamic Period Columns
+          sortedPeriods.forEach((per, idx) => {
+            const entries = programa.filter(p => p.ID_Concepto == c.ID_Concepto && `${formatDate(p.Fecha_Inicio)} al ${formatDate(p.Fecha_Fin)}` === per);
+            const val = entries.reduce((sum, item) => sum + (parseFloat(item.Monto_Programado) || 0), 0);
+            const pctGlobal = montoTotal > 0 ? (val / montoTotal) * 100 : 0;
+
+            colTotals[idx] += val;
+            let cellContent = '-';
+            if (val > 0) {
+              cellContent = `
+                <div class="font-bold">${formatMoney(val)}</div>
+                <div class="text-[9px] text-inst-gold/70">${pctGlobal.toFixed(2)}%</div>
+              `;
+            }
+            const cellCss = val > 0 ? 'bg-inst-gold/5 text-inst-gold' : 'text-gray-300';
+            rowHTML += `<td class="px-4 py-3 text-center text-xs border-r border-gray-100 ${cellCss}">${cellContent}</td>`;
+          });
+
+          // Row Totals
+          rowHTML += `<td class="px-4 py-3 text-right font-black text-xs bg-gray-50 text-inst-textPrimary border-l border-gray-200">${formatMoney(rowTotal)}</td></tr>`;
+          bodyHTML += rowHTML;
+          grandTotal += rowTotal;
+        });
+
+        // 4. Build Footer Row (Vertical Totals)
+        let footHTML = `
+          <tr class="bg-inst-accent text-white font-black">
+            <td class="px-4 py-4 sticky left-0 bg-inst-accent z-10 border-r border-white/20">TOTAL POR PERIODO</td>
+            <td class="px-4 py-4 text-right bg-inst-accentLight/50">100%</td>
+        `;
+        colTotals.forEach(val => {
+          const pctTotal = grandTotal > 0 ? (val / grandTotal) * 100 : 0;
+          footHTML += `
+            <td class="px-4 py-4 text-center border-r border-white/20">
+              <div class="text-xs">${formatMoney(val)}</div>
+              <div class="text-[9px] opacity-80">${pctTotal.toFixed(1)}% del Total</div>
+            </td>`;
+        });
+        footHTML += `<td class="px-4 py-4 text-right text-sm bg-inst-accentLight">${formatMoney(grandTotal)}</td></tr>`;
+
+        if (progBody) progBody.innerHTML = bodyHTML + footHTML;
+      }
+
+      // 2.B Load Registro de Estimaciones (linked via Concepts)
+      const estimaciones = (DB['Estimaciones'] || []).filter(e => conceptIds.includes(e.ID_Concepto));
+
+      const tlContainer = document.getElementById('expEstimaciones');
+      tlContainer.innerHTML = '';
+
+      if (estimaciones.length === 0) {
+        tlContainer.innerHTML = `<div class="text-center text-gray-400 py-10 font-medium">No hay estimaciones registradas.</div>`;
+      }
+
+      // Loop over Estimaciones to render list and compute payments
+      estimaciones.forEach(est => {
+        // Find Facturas for this Estimacion
+        const facturas = (DB['Facturas'] || []).filter(f => f.ID_Estimacion == est.ID_Estimacion);
+
+        // Find Pagos Emitidos for this Estimacion
+        const pagos = (DB['Pagos_Emitidos'] || []).filter(p => p.ID_Estimacion == est.ID_Estimacion);
+
+        // Sum paid amounts matching this estimation
+        const sumPagos = pagos.reduce((sum, p) => sum + (parseFloat(p.Monto_Pagado) || 0), 0);
+        totalPagado += sumPagos;
+
+        // Render Timeline Card for this Estimacion
+        const isValidated = est.Estado_Validacion === 'VALIDADO';
+
+        let facTags = '';
+        facturas.forEach(f => {
+          let fpLink = '';
+          if (f.Link_Sharepoint) {
+            fpLink = `<a href="${f.Link_Sharepoint}" target="_blank" class="ml-1 text-blue-400 hover:text-blue-600"><svg class="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg></a>`;
+          }
+          facTags += `<span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200 mr-2">
+            <svg class="w-3 h-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>Fac: ${f.Folio_Fiscal_UUID ? f.Folio_Fiscal_UUID.substring(0, 8) + '...' : 'S/N'}
+            ${fpLink}
+          </span>`;
+        });
+        if (!facTags) facTags = `<span class="text-xs text-gray-400 italic">Sin factura vinculada</span>`;
+
+        let payTags = '';
+        pagos.forEach(p => {
+          payTags += `<span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-green-50 text-green-700 border border-green-200 mr-2"><svg class="w-3 h-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>Pago: ${formatMoney(p.Monto_Pagado)} (${formatDate(p.Fecha_Pago)})</span>`;
+        });
+
+        tlContainer.innerHTML += `
+          <div class="bg-white border ${isValidated ? 'border-green-100' : 'border-gray-200'} p-4 rounded-lg shadow-sm flex items-start gap-4">
+             <div class="flex-shrink-0 mt-1">
+               <div class="w-8 h-8 rounded-full ${isValidated ? 'bg-green-50 text-green-600' : 'bg-inst-accent/10 text-inst-accent'} border border-current flex items-center justify-center font-bold text-xs">
+                 ${est.No_Estimacion}
+               </div>
+             </div>
+             <div class="flex-1">
+                <div class="flex justify-between items-start mb-2">
+                  <div>
+                    <h5 class="font-bold text-sm text-gray-900 flex items-center gap-2">
+                      Estimación Vol. ${est.No_Estimacion}
+                      <span class="px-1.5 py-0.5 rounded text-[8px] font-black uppercase ${isValidated ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}">${est.Estado_Validacion || 'BORRADOR'}</span>
+                    </h5>
+                    <p class="text-[10px] text-gray-500">${formatDate(est.Periodo_Inicio)} al ${formatDate(est.Periodo_Fin)}</p>
+                  </div>
+                  <div class="text-right">
+                    <span class="font-bold text-inst-textPrimary block">${formatMoney(est.Monto_Neto_A_Pagar)}</span>
+                  </div>
+               </div>
+               
+               <div class="flex justify-end mb-2">
+                 ${est.Link_Sharepoint ? `<a href="${est.Link_Sharepoint}" target="_blank" class="inline-flex items-center gap-1 text-[9px] font-bold text-blue-600 hover:underline"><svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>SharePoint</a>` : ''}
+               </div>
+               
+               <div class="flex flex-col gap-2 border-t border-gray-100 pt-3">
+                 <div class="flex justify-between items-center mb-1">
+                    <span class="text-[10px] font-bold text-gray-500 uppercase">Detalles</span>
+                    <div class="flex gap-2">
+                      <button onclick="editModalContextual('Estimaciones', '${est.ID_Estimacion}')" class="text-[10px] text-blue-600 hover:underline">Editar</button>
+                      <input type="file" id="fileDet_${est.ID_Estimacion}" accept=".xlsx, .xls, .csv, .pdf" class="hidden" onchange="handleExcelUpload(event, 'Detalle_Estimacion', '${est.ID_Estimacion}')">
+                      <button onclick="document.getElementById('fileDet_${est.ID_Estimacion}').click()"
+                        class="text-[10px] font-bold bg-white border border-gray-200 text-gray-500 hover:text-inst-accent px-2 py-0.5 rounded transition-colors flex items-center gap-1 shadow-xs">
+                        Subir Detalle
+                      </button>
+                    </div>
+                 </div>
+                 <div class="grid grid-cols-2 gap-2 mt-1">
+                   <div><span class="text-[9px] font-bold text-gray-400 uppercase block mb-1">Facturas</span>${facTags}</div>
+                   <div><span class="text-[9px] font-bold text-gray-400 uppercase block mb-1">Pagos</span>${payTags}</div>
+                 </div>
+                 
+                 <div id="estDetail_${est.ID_Estimacion}" class="hidden mt-2 bg-gray-50 rounded border border-gray-100 p-2 overflow-x-auto">
+                    <table class="w-full text-[10px]">
+                      <thead><tr class="text-gray-400 border-b border-gray-200"><th class="text-left py-1">Clave</th><th class="text-right py-1">Cant.</th><th class="text-right py-1">Imp.</th></tr></thead>
+                      <tbody>
+                        ${((DB['Detalle_Estimacion'] || []).filter(d => d.ID_Estimacion == est.ID_Estimacion).map(d => {
+          const c = (DB['Catalogo_Conceptos'] || []).find(x => x.ID_Concepto == d.ID_Concepto);
+          return `<tr><td class="py-1">${c ? c.Clave : 'N/A'}</td><td class="text-right py-1 font-bold">${d.Cantidad_Estimada_Periodo || '-'}</td><td class="text-right py-1">${formatMoney(d.Importe_Este_Periodo)}</td></tr>`;
+        }).join('') || '')}
+                      </tbody>
+                    </table>
+                 </div>
+
+               </div>
+              </div>
+            </div>
+          </div>
+        `;
+
+        let actions = document.createElement("div");
+        actions.className = "flex gap-2 justify-end mb-2 mt-2";
+        if ((DB['Detalle_Estimacion'] || []).some(d => d.ID_Estimacion == est.ID_Estimacion)) {
+          actions.innerHTML = '<button onclick="toggleEstDetail(\'' + est.ID_Estimacion + '\')" class="text-[10px] font-bold text-inst-accent hover:underline">Ver Desglose</button>' +
+            '<button onclick="generarCaratulaEstimacion(\'' + est.ID_Estimacion + '\')" class="text-[10px] ml-2 font-bold bg-inst-accent/10 text-inst-accent hover:bg-inst-accent hover:text-white px-2 py-0.5 rounded transition-colors flex items-center gap-1">Ver Carátula</button>';
+          tlContainer.lastElementChild.querySelector('.flex-1').appendChild(actions);
+        }
+      });
+
+      // 3. Render Catálogo de Conceptos
+      let activeExpedienteId = contratoId; // Track for Excel importer
+      window.currentExpedienteId = contratoId;
+
+      const catalogBody = document.getElementById('tblConceptosBody');
+      const conceptos = (DB['Catalogo_Conceptos'] || []).filter(c => c.ID_Contrato == contratoId);
+      if (catalogBody) catalogBody.innerHTML = '';
+
+      if (conceptos.length === 0) {
+        catalogBody.innerHTML = `<tr><td colspan="6" class="px-6 py-10 text-center text-gray-400">El catálogo maestro no ha sido capturado. Por favor importa el anexo presupuestal.</td></tr>`;
+      } else {
+        const detallesTotales = DB['Detalle_Estimacion'] || [];
+
+        conceptos.forEach(c => {
+          // Calculate Executed Volume for this Concept
+          const misDetalles = detallesTotales.filter(d => d.ID_Concepto == c.ID_Concepto);
+          const volEjecutado = misDetalles.reduce((sum, d) => sum + (parseFloat(d.Cantidad_Estimada_Periodo) || 0), 0);
+
+          let alertTag = '';
+          if (volEjecutado > c.Cantidad_Contratada && c.Cantidad_Contratada > 0) {
+            alertTag = `<span class="ml-2 text-[10px] bg-red-100 text-red-700 px-1 py-0.5 rounded font-bold" title="Sobreejecución">Sobregiro</span>`;
+          }
+
+          const volClass = volEjecutado > 0 ? 'text-green-600 font-bold' : '';
+
+          catalogBody.innerHTML += `
+                <tr class="hover:bg-gray-50 transition-colors">
+                  <td class="px-4 py-3 text-inst-accent font-bold">${c.Clave}</td>
+                  <td class="px-4 py-3 truncate max-w-sm" title="${c.Descripcion}">${c.Descripcion}</td>
+                  <td class="px-4 py-3 text-center text-gray-500">${c.Unidad}</td>
+                  <td class="px-4 py-3 text-right">
+                    <div class="font-medium text-gray-900">${c.Cantidad_Contratada}${alertTag}</div>
+                    <div class="text-[10px] text-gray-500 mt-0.5">Ejecutado: <span class="${volClass}">${volEjecutado.toFixed(2)}</span></div>
+                  </td>
+                  <td class="px-4 py-3 text-right">${formatMoney(c.Precio_Unitario)}</td>
+                  <td class="px-4 py-3 text-right">
+                    <div class="font-medium text-gray-900">${formatMoney((c.Cantidad_Contratada * c.Precio_Unitario) || 0)}</div>
+                    <div class="text-[10px] text-gray-500 mt-0.5">Avance: ${formatMoney((volEjecutado * c.Precio_Unitario) || 0)}</div>
+                  </td>
+               </tr >
+          `;
+        });
+      }
+
+      // Update Header Numbers
+      document.getElementById('expMontoTotal').innerText = formatMoney(montoTotal);
+      document.getElementById('expTotalPagado').innerText = formatMoney(totalPagado);
+
+      const saldo = montoTotal - totalPagado;
+      document.getElementById('expSaldo').innerText = formatMoney(saldo);
+
+      const saldoEl = document.getElementById('expSaldo');
+      if (saldo <= 0 && montoTotal > 0) {
+        saldoEl.className = "text-2xl font-black text-green-500";
+      } else {
+        saldoEl.className = "text-2xl font-black text-orange-500";
+      }
+
+      let pct = 0;
+      if (montoTotal > 0) pct = Math.min((totalPagado / montoTotal) * 100, 100).toFixed(1);
+
+      document.getElementById('expProgresoText').innerText = `${pct}% `;
+      // small delay for css animation
+      setTimeout(() => {
+        document.getElementById('expProgresoBar').style.width = `${pct}% `;
+      }, 100);
+
+      // Populate Convenios Tab
+      const convCont = document.getElementById('tab-exp-convenios-content');
+      const convenios = (DB['Convenios_Modificatorios'] || []).filter(c => c.ID_Contrato == contratoId);
+      const anticipos = (DB['Anticipos'] || []).filter(a => a.ID_Contrato == contratoId);
+
+      if (!convCont) return console.error("Elemento 'tab-exp-convenios-content' no encontrado");
+
+      let conveniosHTML = '<p class="text-gray-400 italic">No hay convenios registrados.</p>';
+      if (convenios.length > 0) {
+        let tbodyConv = convenios.map(c => `< tr ><td class="py-2 font-medium">${c.Numero_Convenio || 'S/N'}</td><td class="py-2">${formatMoney(c.Monto_Modificatorio)}</td><td class="py-2">${c.Dias_Prorroga || 0}</td></tr > `).join('');
+        conveniosHTML = `
+          < table class="w-full text-left" >
+              <thead><tr class="text-xs text-gray-500 uppercase"><th class="py-2">Número</th><th class="py-2">Monto</th><th class="py-2">Días</th></tr></thead>
+              <tbody>${tbodyConv}</tbody>
+           </table >
+          `;
+      }
+
+      let anticiposHTML = '<p class="text-gray-400 italic">No hay anticipos registrados.</p>';
+      if (anticipos.length > 0) {
+        let tbodyAnt = anticipos.map(a => `< tr ><td class="py-2 font-medium text-inst-gold">${a.Tipo_Anticipo || 'Inicio'}</td><td class="py-2">${formatMoney(a.Monto_Anticipo)}</td><td class="py-2">${a.Fecha_Deposito_Anticipo ? 'Depositado' : 'Pendiente'}</td></tr > `).join('');
+        anticiposHTML = `
+          < table class="w-full text-left" >
+              <thead><tr class="text-xs text-gray-500 uppercase"><th class="py-2">Tipo</th><th class="py-2">Monto</th><th class="py-2">Status</th></tr></thead>
+              <tbody>${tbodyAnt}</tbody>
+           </table >
+          `;
+      }
+
+      let convHTML = `
+          < div class="grid grid-cols-1 gap-6" >
+           <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-4 text-sm">
+              <h4 class="font-bold text-gray-800 mb-4 border-b pb-2">Convenios Modificatorios</h4>
+              ${conveniosHTML}
+              <button onclick="openFormModal('Convenios_Modificatorios', {ID_Contrato: '${contratoId}'})" class="mt-4 text-xs font-bold text-inst-accent hover:underline">+ Agregar Convenio</button>
+           </div>
+           <div class="bg-white rounded-xl border border-gray-200 shadow-sm p-4 text-sm">
+              <h4 class="font-bold text-gray-800 mb-4 border-b pb-2">Anticipos</h4>
+              ${anticiposHTML}
+              <button onclick="openFormModal('Anticipos', {ID_Contrato: '${contratoId}'})" class="mt-4 text-xs font-bold text-inst-gold hover:underline">+ Agregar Anticipo</button>
+           </div>
+        </div >
+          `;
+      convCont.innerHTML = convHTML;
+
+      activeExpedienteId = contratoId; // Update for generic Excel importer
+      window.currentExpedienteId = contratoId;
+
+      // 5. Navigate to Expediente Tab
+      navigate('expediente');
+    }
+
+    function toggleEstDetail(id) {
+      const el = document.getElementById(`estDetail_${id} `);
+      if (el) el.classList.toggle('hidden');
+    }
+
+    // Context-locked modal opener
+    function openFormModalPrefilled(tableName, prefillData) {
+      openFormModal(tableName, null); // opens an empty create form
+      // Now inject locks
+      Object.keys(prefillData).forEach(k => {
+        const el = document.getElementById(`ui_${k} `);
+        if (el) {
+          el.value = prefillData[k];
+          el.setAttribute('disabled', 'true');
+          el.classList.add('bg-gray-100', 'text-gray-500');
+
+          // Warning: We need to also keep the disabled values in the form submit.
+          // HTML disabled inputs don't submit their values in FormData, but we parse manually via ID in saveDynamicRecord.
+        }
+      });
+    }
+
+    // --- VIEW LOGIC: DATABASE EXPLORER ---
+    function buildExplorerTabs() {
+      const tabContainer = document.getElementById('explorerTabs');
+      tabContainer.innerHTML = '';
+
+      Object.keys(SCHEMA).forEach(tableName => {
+        const isAct = tableName === activeTableName;
+        const clz = isAct
+          ? "py-2 px-4 text-sm font-bold border-b-2 border-inst-accent text-inst-accent bg-gray-50"
+          : "py-2 px-4 text-sm font-medium text-gray-500 hover:text-gray-700 hover:bg-gray-50 border-b-2 border-transparent transition-colors";
+
+        tabContainer.innerHTML += `< button onclick = "switchExplorerTable('${tableName}')" class="${clz} whitespace-nowrap" > ${tableName.replace(/_/g, " ")}</button > `;
+      });
+
+      const btnLabel = document.getElementById('btnNewDynamicText');
+      btnLabel.innerText = "Nuevo: " + activeTableName.replace(/_/g, " ");
+      document.getElementById('btnNewDynamic').classList.remove('hidden');
+    }
+
+    function switchExplorerTable(tableName) {
+      activeTableName = tableName;
+      buildExplorerTabs();
+      loadTableData(tableName);
+    }
+
+    function loadTableData(tableName) {
+      document.getElementById('explorerBody').innerHTML = `< tr > <td colspan="10" class="py-12 text-center text-gray-400">Cargando <b>${tableName}</b>...</td></tr > `;
+
+      google.script.run
+        .withSuccessHandler(data => {
+          const parsedData = typeof data === 'string' ? JSON.parse(data) : data;
+          DB[tableName] = parsedData; // cache for UI updates
+          renderExplorerGrid(tableName, parsedData);
+        })
+        .withFailureHandler(err => toast(err.message, 'error'))
+        .dbSelect(tableName, {});
+    }
+
+    function renderExplorerGrid(tableName, data) {
+      const headers = SCHEMA[tableName];
+      const pkName = headers[0];
+
+      const thead = document.getElementById('explorerHead');
+      const tbody = document.getElementById('explorerBody');
+
+      let headHTML = '<tr>';
+      headers.forEach(h => headHTML += '<th class="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">' + h.replace(/_/g, " ") + '</th>');
+      headHTML += '<th class="px-4 py-3 text-right sticky right-0 bg-gray-50 shadow-sm">Acciones</th></tr>';
+      thead.innerHTML = headHTML;
+
+      if (data.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="' + (headers.length + 1) + '" class="px-4 py-8 text-center text-gray-400 font-medium">No existen registros en esta tabla. Usa el botón superior para crear.</td></tr>';
+        return;
+      }
+
+      let bodyHTML = '';
+      data.forEach(function (row) {
+        bodyHTML += '<tr class="hover:bg-inst-gold/5 transition-colors">';
+
+        headers.forEach(function (h) {
+          const raw = row[h] !== undefined ? String(row[h]) : '';
+          const val = raw.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/\x60/g, '&#96;').replace(/\n/g, ' ').replace(/\r/g, '');
+          bodyHTML += '<td class="px-4 py-3 whitespace-nowrap overflow-hidden text-ellipsis max-w-[200px]" title="' + val + '">' + val + '</td>';
+        });
+
+        const safeId = String(row[pkName] || '').replace(/[^a-zA-Z0-9_\-]/g, '');
+
+        bodyHTML += '<td class="px-4 py-3 text-right whitespace-nowrap sticky right-0 bg-white group-hover:bg-gray-50 border-l border-gray-100">';
+        bodyHTML += '<button onclick="editModalContextual(\'' + tableName + '\', \'' + safeId + '\')" class="text-blue-600 hover:text-blue-800 mx-1 p-1">[Edit]</button>';
+        bodyHTML += '<button onclick="deleteContextual(\'' + tableName + '\', \'' + safeId + '\')" class="text-rose-500 hover:text-rose-700 mx-1 p-1">[Delete]</button>';
+        bodyHTML += '</td></tr>';
+      });
+
+      tbody.innerHTML = bodyHTML;
+    }
+
+    function openFormModal(tableName, recordObj = null) {
+      const headers = SCHEMA[tableName];
+      if (!headers) return toast("Esquema no encontrado.", "error");
+
+      // Reset panel width from potential Carátula view
+      const panel = document.getElementById('formModalPanel');
+      panel.classList.remove('max-w-5xl', 'max-w-6xl', 'w-11/12', 'max-w-[1400px]');
+      panel.classList.add('max-w-2xl');
+
+      currentContextualTable = tableName;
+      const pkName = headers[0];
+      isEditing = !!(recordObj && recordObj[pkName]);
+      editPkField = pkName;
+      editPkValue = isEditing ? recordObj[pkName] : null;
+
+      document.getElementById('formModalTitle').innerText = isEditing ? `Edición: ${tableName.replace(/_/g, " ")}` : `Nuevo Registro: ${tableName.replace(/_/g, " ")}`;
+
+      // Show AI button only on inserts (not edits) and hide it for certain system tables
+      const aiBtn = document.getElementById('btnAiContextual');
+      if (!isEditing && !['Usuarios_Sistema', 'Parametros_Sistema'].includes(tableName)) {
+        aiBtn.classList.remove('hidden');
+      } else {
+        aiBtn.classList.add('hidden');
+      }
+
+      const grid = document.getElementById('formFieldsGrid');
+      grid.innerHTML = '';
+
+      // --- NEW: PREMIUM DRAFT HEADER ---
+      if (tableName === 'Estimaciones' && recordObj && recordObj.No_Estimacion) {
+        const headerDiv = document.createElement('div');
+        headerDiv.className = "md:col-span-2 bg-inst-accent/5 border border-inst-accent/10 rounded-xl p-4 mb-4 flex items-center justify-between";
+        headerDiv.innerHTML = `
+          <div class="flex items-center gap-3">
+            <div class="p-2 bg-inst-accent rounded-lg text-white shadow-sm">
+              <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <div>
+              <div class="text-[10px] font-bold text-inst-accent uppercase tracking-widest mb-0.5">Borrador de Estimación</div>
+              <div class="text-sm font-bold text-inst-textPrimary">Estimación #${recordObj.No_Estimacion} - Periodo Programado</div>
+            </div>
+          </div>
+          <div class="text-right">
+            <div class="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-0.5">Estado Inicial</div>
+            <div class="ctx-badge ctx-badge-accent">BORRADOR AUTOMÁTICO</div>
+          </div>
+        `;
+        grid.appendChild(headerDiv);
+      }
+
+      headers.forEach(h => {
+        let type = "text"; let step = ""; let val = recordObj ? (recordObj[h] || "") : "";
+        let hide = false; let readOnly = false;
+
+        const l = h.toLowerCase();
+        if (l.includes('fecha')) type = "date";
+        else if (l.includes('monto') || l.includes('importe') || l.includes('porcentaje') || l.includes('pct') || l.includes('cantidad')) {
+          type = "number";
+          step = "0.01";
+        }
+        else if (l.includes('sharepoint') || l.includes('link')) type = "url";
+
+        if (h === pkName) {
+          readOnly = true;
+          hide = true;
+        }
+
+        // --- NEW: CONTEXT LOCKING (Lock Contrato if already known) ---
+        let forceBadge = false;
+        if (h === 'ID_Contrato' && recordObj && recordObj.ID_Contrato) {
+          readOnly = true;
+          forceBadge = true;
+        }
+
+        if (!hide) {
+          const d = document.createElement('div');
+          // --- NEW: 2-COLUMN LAYOUT FOR FINANCIAL FIELDS ---
+          const isFinancial = l.includes('monto') || l.includes('importe') || l.includes('iva') || l.includes('subtotal') || l.includes('neto');
+          d.className = isFinancial ? "input-group mb-0 md:col-span-1" : "input-group mb-0 md:col-span-2";
+
+          if (h === 'ID_Contratista' || h === 'ID_Contrato') d.className = "input-group mb-0 md:col-span-2";
+
+          let inputHtml = '';
+
+          // --- FOREIGN KEY TO DROPDOWN MAPPING LOGIC ---
+          if (h.startsWith('ID_') && h !== pkName && !forceBadge) {
+            let optionsHtml = '<option value="">-- Seleccionar --</option>';
+
+            if (h === 'ID_Contratista' && DB['Contratistas']) {
+              DB['Contratistas'].forEach(emp => {
+                const sel = (val == emp.ID_Contratista) ? 'selected' : '';
+                optionsHtml += `<option value="${emp.ID_Contratista}" ${sel}>${emp.Razon_Social} (${emp.RFC})</option>`;
+              });
+            } else if ((h === 'ID_Convenio_Vinculado' || h === 'ID_Convenio') && DB['Convenios_Recurso']) {
+              DB['Convenios_Recurso'].forEach(conv => {
+                const sel = (val == conv.ID_Convenio) ? 'selected' : '';
+                optionsHtml += `<option value="${conv.ID_Convenio}" ${sel}>Acuerdo: ${conv.Numero_Acuerdo || 'S/N'} - ${conv.Nombre_Fondo || ''}</option>`;
+              });
+            } else if (h === 'ID_Contrato' && DB['Contratos']) {
+              DB['Contratos'].forEach(c => {
+                const sel = (val == c.ID_Contrato) ? 'selected' : '';
+                optionsHtml += `<option value="${c.ID_Contrato}" ${sel}>Contrato: ${c.Numero_Contrato}</option>`;
+              });
+            } else if (h === 'ID_Concepto' && DB['Catalogo_Conceptos']) {
+              const currentContrato = window.currentExpedienteId;
+              DB['Catalogo_Conceptos']
+                .filter(c => c.ID_Contrato == currentContrato)
+                .forEach(conc => {
+                  const sel = (val == conc.ID_Concepto) ? 'selected' : '';
+                  optionsHtml += `<option value="${conc.ID_Concepto}" ${sel}>${conc.Clave} - ${conc.Descripcion.substring(0, 40)}...</option>`;
+                });
+            } else {
+              optionsHtml += `<option value="${val}" selected>${val || 'Pendiente...'}</option>`;
+            }
+
+            inputHtml = `<select id="ui_${h}" ${readOnly ? 'disabled class="input-field bg-gray-50 text-gray-500"' : 'class="input-field"'}>${optionsHtml}</select>`;
+
+          } else if (forceBadge) {
+            // Display locked ID as a badge + hidden input to preserve value for saveDynamicRecord
+            const contrato = (DB['Contratos'] || []).find(c => c.ID_Contrato == val);
+            const label = contrato ? `Contrato: ${contrato.Numero_Contrato}` : `ID: ${val}`;
+            inputHtml = `<div class="mt-1 flex items-center h-10 px-1"><span class="ctx-badge bg-blue-50 border-blue-100 text-blue-700">${label}</span></div>
+                         <input type="hidden" id="ui_${h}" value="${val}">`;
+
+          } else if (h === 'Estado') {
+            const estados = ["AGUASCALIENTES", "BAJA CALIFORNIA", "BAJA CALIFORNIA SUR", "CAMPECHE", "CHIAPAS", "CHIHUAHUA", "CIUDAD DE MÉXICO", "COAHUILA", "COLIMA", "DURANGO", "ESTADO DE MÉXICO", "GUANAJUATO", "GUERRERO", "HIDALGO", "JALISCO", "MICHOACÁN", "MORELOS", "NAYARIT", "NUEVO LEÓN", "OAXACA", "PUEBLA", "QUERÉTARO", "QUINTANA ROO", "SAN LUIS POTOSÍ", "SINALOA", "SONORA", "TABASCO", "TAMAULIPAS", "TLAXCALA", "VERACRUZ", "YUCATÁN", "ZACATECAS"];
+            let optionsHtml = '<option value="">-- Seleccionar Estado --</option>';
+            estados.forEach(est => {
+              const sel = (val === est) ? 'selected' : '';
+              optionsHtml += `<option value="${est}" ${sel}>${est}</option>`;
+            });
+            inputHtml = `<select id="ui_${h}" ${readOnly ? 'disabled class="input-field bg-gray-50 text-gray-500"' : 'class="input-field"'}>${optionsHtml}</select>`;
+          } else if (h === 'Estado' && tableName === 'Contratos') {
+            const estados = ["PROGRAMADO", "VIGENTE", "CIERRE ADMINISTRATIVO", "FINIQUITADO"];
+            let optionsHtml = '';
+            estados.forEach(est => {
+              const sel = (val === est) ? 'selected' : '';
+              optionsHtml += `<option value="${est}" ${sel}>${est}</option>`;
+            });
+            inputHtml = `<select id="ui_${h}" ${readOnly ? 'disabled class="input-field bg-gray-50 text-gray-500"' : 'class="input-field"'}>${optionsHtml}</select>`;
+          } else {
+            // --- NEW: CURRENCY WRAPPER ---
+            const needsCurrency = l.includes('monto') || l.includes('importe') || l.includes('iva') || l.includes('subtotal') || l.includes('neto');
+            const inputBase = `<input type="${type}" id="ui_${h}" step="${step}" value="${val}" ${readOnly ? 'disabled class="input-field bg-gray-100 text-gray-500 select-none"' : 'class="input-field"'}>`;
+
+            inputHtml = needsCurrency ? `<div class="currency-input-wrapper">${inputBase}</div>` : inputBase;
+          }
+
+          let cleanLabel = h;
+          if (cleanLabel.startsWith('ID_')) {
+            cleanLabel = cleanLabel.substring(3); // Remove ID_
+          }
+          cleanLabel = cleanLabel.replace(/_/g, " "); // Replace remaining underscores
+
+          if (h === 'ID_Contratista') {
+            d.className += " md:col-span-2";
+          }
+
+          d.innerHTML = `
+                 <label class="input-label">${cleanLabel}</label>
+                 ${inputHtml}
+               `;
+          grid.appendChild(d);
+        }
+      });
+
+      // Reveal
+      const m = document.getElementById('formModal');
+      m.classList.remove('hidden');
+      m.classList.add('flex');
+      document.getElementById('formModalPanel').classList.add('modal-enter-active');
+    }
+
+    function editModalContextual(tableName, id) {
+      const pkName = SCHEMA[tableName][0];
+      const rec = (DB[tableName] || []).find(x => x[pkName] == id);
+      if (rec) openFormModal(tableName, rec);
+      else toast("Registro no localizado en memoria. Refresque.", "error");
+    }
+
+    function closeFormModal() {
+      const p = document.getElementById('formModalPanel');
+      p.classList.remove('modal-enter-active'); p.classList.add('modal-exit');
+      setTimeout(() => {
+        document.getElementById('formModal').classList.add('hidden');
+        document.getElementById('formModal').classList.remove('flex');
+        p.classList.remove('modal-exit');
+        // Reset width
+        p.classList.remove('max-w-5xl', 'max-w-6xl', 'w-11/12', 'max-w-[1400px]');
+        p.classList.add('max-w-2xl');
+      }, 200);
+    }
+
+    // --- VIEW LOGIC: EXCEL/CSV/PDF IMPORTER ---
+    function handleExcelUpload(event, tableName, parentId = null) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      if (!window.currentExpedienteId) {
+        return toast("Error: No hay un expediente activo para vincular.", "error");
+      }
+
+      // ROUTE TO AI IF PDF OR (Catalogo/Programa table)
+      const isAiTable = ['Catalogo_Conceptos', 'Programa_Ejecucion'].includes(tableName);
+      if (file.name.toLowerCase().endsWith('.pdf') || isAiTable) {
+        let ctx = { 'ID_Contrato': window.currentExpedienteId };
+        if (tableName === 'Detalle_Estimacion' && parentId) ctx['ID_Estimacion'] = parentId;
+
+        showLoader(`El Agente IA está analizando ${file.name} para ${tableName}...`);
+
+        const reader = new FileReader();
+        reader.onload = e => {
+          let dataToSend = e.target.result;
+          let mimeToSend = file.type;
+
+          // Conversion logic for Excel to CSV (Unsupported by Gemini inlineData if left as XLSX)
+          if (file.name.toLowerCase().endsWith('.xlsx') || file.name.toLowerCase().endsWith('.xls')) {
+            try {
+              const workbook = XLSX.read(e.target.result, { type: 'array' });
+              const csv = XLSX.utils.sheet_to_csv(workbook.Sheets[workbook.SheetNames[0]]);
+              // We convert CSV text to base64 for consistency with the AI handler
+              dataToSend = "data:text/csv;base64," + btoa(unescape(encodeURIComponent(csv)));
+              mimeToSend = "text/csv";
+              console.log("SGC: Excel convertido a CSV para procesamiento AI.");
+            } catch (err) {
+              hideLoader();
+              return toast("Error convirtiendo Excel a CSV: " + err.message, "error");
+            }
+          }
+
+          google.script.run
+            .withSuccessHandler(res => {
+              hideLoader();
+              event.target.value = '';
+              if (res.success) {
+                toast("Base de conocimiento actualizada por el Agente IA con éxito.");
+                preloadData(); // Full refresh maintaining current view
+              } else toast("Atención AI: " + res.message, "error");
+            })
+            .withFailureHandler(err => {
+              hideLoader();
+              event.target.value = '';
+              toast(err.message, "error");
+            })
+            .processDocumentWithAI(dataToSend, mimeToSend, tableName, ctx);
+        };
+
+        if (file.name.toLowerCase().endsWith('.xlsx') || file.name.toLowerCase().endsWith('.xls')) {
+          reader.readAsArrayBuffer(file);
+        } else {
+          reader.readAsDataURL(file);
+        }
+        return;
+      }
+
+      showLoader("Analizando celdas Excel/CSV...");
+
+      const reader = new FileReader();
+      reader.onload = function (e) {
+        try {
+          const data = new Uint8Array(e.target.result);
+          const workbook = XLSX.read(data, { type: 'array' });
+          const firstSheetName = workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[firstSheetName];
+
+          const jsonRaw = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+          if (jsonRaw.length < 2) throw new Error("El archivo parece estar vacío o sin encabezados.");
+
+          let headerRowIndex = 0;
+          while (headerRowIndex < jsonRaw.length && (!jsonRaw[headerRowIndex] || jsonRaw[headerRowIndex].length === 0)) {
+            headerRowIndex++;
+          }
+
+          let mappedData = [];
+
+          if (tableName === 'Catalogo_Conceptos') {
+            // A=Clave, B=Desc, C=Unidad, D=Cant, E=PU
+            for (let i = headerRowIndex + 1; i < jsonRaw.length; i++) {
+              const row = jsonRaw[i];
+              if (!row || row.length === 0 || !row[0]) continue;
+              mappedData.push({
+                'ID_Contrato': window.currentExpedienteId,
+                'Clave': row[0] || '',
+                'Descripcion': row[1] || '',
+                'Unidad': row[2] || 'SRV',
+                'Cantidad_Contratada': parseFloat(row[3]) || 0,
+                'Precio_Unitario': parseFloat(row[4]) || 0,
+                'Importe_Total_Sin_IVA': (parseFloat(row[3]) || 0) * (parseFloat(row[4]) || 0)
+              });
+            }
+          }
+          else if (tableName === 'Programa_Ejecucion') {
+            // A=Clave (Lookup ID), B=No. Prog, C=Fecha_Inicio, D=Fecha_Fin, E=Monto, F=Avance_Pct
+            const catalogo = (DB['Catalogo_Conceptos'] || []).filter(c => c.ID_Contrato == window.currentExpedienteId);
+            for (let i = headerRowIndex + 1; i < jsonRaw.length; i++) {
+              const row = jsonRaw[i];
+              if (!row || row.length === 0 || !row[0]) continue;
+
+              const clave = String(row[0]).trim();
+              const conceptoMatch = catalogo.find(c => String(c.Clave).trim() === clave);
+
+              if (conceptoMatch) {
+                mappedData.push({
+                  'ID_Concepto': conceptoMatch.ID_Concepto,
+                  'Numero_Programa': row[1] || '',
+                  'Fecha_Inicio': row[2] || '',
+                  'Fecha_Fin': row[3] || '',
+                  'Monto_Programado': parseFloat(row[4]) || 0,
+                  'Avance_Programado_Pct': parseFloat(row[5]) || 0
+                });
+              } else {
+                console.warn(`Clave de concepto no encontrada en catálogo para programa: ${clave}`);
+              }
+            }
+          }
+          else if (tableName === 'Detalle_Estimacion') {
+            // A=Clave (Lookup ID), B=Porcentaje_Avance_Este_Periodo, C=Importe_Este_Periodo, D=Avance_Acumulado_Porcentaje, E=Importe_Acumulado
+            const catalogo = (DB['Catalogo_Conceptos'] || []).filter(c => c.ID_Contrato == window.currentExpedienteId);
+
+            for (let i = headerRowIndex + 1; i < jsonRaw.length; i++) {
+              const row = jsonRaw[i];
+              if (!row || row.length === 0 || !row[0]) continue;
+
+              const clave = String(row[0]).trim();
+              const conceptoMatch = catalogo.find(c => String(c.Clave).trim() === clave);
+
+              if (conceptoMatch) {
+                mappedData.push({
+                  'ID_Estimacion': parentId,
+                  'ID_Concepto': conceptoMatch.ID_Concepto,
+                  'Porcentaje_Avance_Este_Periodo': parseFloat(row[1]) || 0,
+                  'Importe_Este_Periodo': parseFloat(row[2]) || 0,
+                  'Avance_Acumulado_Porcentaje': parseFloat(row[3]) || 0,
+                  'Importe_Acumulado': parseFloat(row[4]) || 0
+                });
+              } else {
+                console.warn(`Clave de concepto no encontrada en catálogo para estimación: ${clave}`);
+              }
+            }
+          }
+          else if (tableName === 'Estimaciones') {
+            for (let i = headerRowIndex + 1; i < jsonRaw.length; i++) {
+              const row = jsonRaw[i];
+              if (!row || row.length === 0 || !row[0]) continue;
+              mappedData.push({
+                'No_Estimacion': row[1] || '',
+                'Tipo_Estimacion': row[2] || 'ORDINARIA',
+                'Periodo_Inicio': row[3] || '',
+                'Periodo_Fin': row[4] || '',
+                'Monto_Bruto_Estimado': parseFloat(row[5]) || 0,
+                'Subtotal': parseFloat(row[6]) || 0,
+                'IVA': parseFloat(row[7]) || 0,
+                'Monto_Neto_A_Pagar': parseFloat(row[8]) || 0
+              });
+            }
+          }
+
+          if (mappedData.length === 0) throw new Error("No se encontraron filas válidas o las Claves no coinciden con el catálogo maestro.");
+
+          const payload = {};
+          payload[tableName] = mappedData;
+
+          document.getElementById('loaderMsg').innerText = `Insertando ${mappedData.length} registros en Base de Datos...`;
+
+          google.script.run
+            .withSuccessHandler(res => {
+              hideLoader();
+              event.target.value = ''; // Reset input
+              if (res.success) {
+                toast(`Éxito. ${mappedData.length} registros importados.`, "success");
+                preloadData(); // Reinvokes navigate to refresh memory
+              } else {
+                toast("Error en la Base de Datos: " + res.message, "error");
+              }
+            })
+            .withFailureHandler(err => {
+              hideLoader();
+              event.target.value = '';
+              toast(err.message, "error");
+            })
+            .guardarDatosIA(payload);
+
+        } catch (err) {
+          hideLoader();
+          event.target.value = '';
+          toast("Error leyendo Excel: " + err.message, "error");
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    }
+
+    // --- ESTIMATION & VERIFICATION LOGIC ---
+    function generarSiguienteEstimacion() {
+      const idContrato = window.currentExpedienteId;
+      if (!idContrato) return toast("No hay contrato seleccionado.", "error");
+
+      const contrato = (DB['Contratos'] || []).find(c => c.ID_Contrato == idContrato);
+      if (!contrato) return toast("Contrato no encontrado.", "error");
+
+      const ests = (DB['Estimaciones'] || []).filter(e => e.ID_Contrato == idContrato);
+      const nextNo = ests.length + 1;
+
+      // 1. Identify associated concepts and program entries
+      const concepts = (DB['Catalogo_Conceptos'] || []).filter(c => c.ID_Contrato == idContrato);
+      const conceptIds = concepts.map(c => c.ID_Concepto);
+      const programa = (DB['Programa_Ejecucion'] || []).filter(p => conceptIds.includes(p.ID_Concepto));
+
+      // 2. Identify and sort unique periods
+      const periodsSet = new Set();
+      programa.forEach(p => {
+        const startTs = new Date(p.Fecha_Inicio).getTime();
+        const endTs = new Date(p.Fecha_Fin).getTime();
+        if (isNaN(startTs) || isNaN(endTs)) return;
+        periodsSet.add(`${startTs}|${endTs}`);
+      });
+
+      const sortedPeriods = Array.from(periodsSet).sort((a, b) => parseInt(a.split('|')[0]) - parseInt(b.split('|')[0]));
+
+      // 3. Map nextNo to Period
+      const mappedPeriodStr = sortedPeriods[nextNo - 1];
+      let montoBruto = 0;
+      let dateStart = null;
+      let dateEnd = null;
+
+      if (mappedPeriodStr) {
+        const [pStartTs, pEndTs] = mappedPeriodStr.split('|').map(Number);
+        dateStart = new Date(pStartTs);
+        dateEnd = new Date(pEndTs);
+
+        const periodEntries = programa.filter(p =>
+          new Date(p.Fecha_Inicio).getTime() === pStartTs &&
+          new Date(p.Fecha_Fin).getTime() === pEndTs
+        );
+        montoBruto = periodEntries.reduce((sum, p) => sum + (parseFloat(p.Monto_Programado) || 0), 0);
+      }
+
+      // 4. Calculate automated financial draft
+      const pctVig = parseFloat(contrato.Retencion_Vigilancia_Pct) || 0.5; // Default 0.5%
+      const iva = (montoBruto * 0.16).toFixed(2);
+      const subtotal = (parseFloat(montoBruto) + parseFloat(iva)).toFixed(2);
+      const deduccion = (montoBruto * (pctVig / 100)).toFixed(2);
+      const neto = (parseFloat(subtotal) - parseFloat(deduccion)).toFixed(2);
+
+      // Create draft data
+      const newEst = {
+        ID_Contrato: idContrato,
+        No_Estimacion: nextNo,
+        Tipo_Estimacion: "ORDINARIA",
+        Periodo_Inicio: dateStart ? dateStart.toISOString().split('T')[0] : "",
+        Periodo_Fin: dateEnd ? dateEnd.toISOString().split('T')[0] : "",
+        Monto_Bruto_Estimado: montoBruto.toFixed(2),
+        Deduccion_Surv_05_Monto: deduccion,
+        Subtotal: subtotal,
+        IVA: iva,
+        Monto_Neto_A_Pagar: neto,
+        Estado_Validacion: "BORRADOR"
+      };
+
+      // Open Carátula View
+      renderCaratula(newEst);
+    }
+
+    function renderCaratula(est) {
+      const idContrato = est.ID_Contrato;
+      const contrato = (DB['Contratos'] || []).find(c => c.ID_Contrato == idContrato);
+      if (!contrato) return toast("Error de contexto de contrato.", "error");
+
+      const contratista = (DB['Contratistas'] || []).find(emp => emp.ID_Contratista == contrato.ID_Contratista);
+      const concepts = (DB['Catalogo_Conceptos'] || []).filter(c => c.ID_Contrato == idContrato);
+      const allEsts = (DB['Estimaciones'] || []).filter(e => e.ID_Contrato == idContrato);
+      const sortedEsts = allEsts.sort((a, b) => (a.No_Estimacion || 0) - (b.No_Estimacion || 0));
+
+      const modalPortal = document.getElementById('formFieldsGrid');
+      modalPortal.innerHTML = '';
+
+      // Expand modal width for document view
+      const panel = document.getElementById('formModalPanel');
+      panel.classList.remove('max-w-2xl', 'max-w-5xl', 'max-w-6xl');
+      panel.classList.add('w-11/12', 'max-w-[1400px]');
+      document.getElementById('formModalTitle').innerText = `Carátula de Estimación #${est.No_Estimacion}`;
+      document.getElementById('formSaveBtn').classList.remove('hidden'); // allow save
+
+      // Build HTML
+      let html = `
+        <div class="md:col-span-2 bg-gray-50 rounded-xl border border-gray-200 p-4 mb-6 shadow-sm">
+           <div class="flex items-center justify-between mb-4 pb-2 border-b border-gray-200">
+             <h4 class="font-bold text-xs text-inst-textSecondary uppercase flex items-center gap-2">
+                <svg class="w-4 h-4 text-inst-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37a1.724 1.724 0 002.572-1.065z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                Configuración Técnica e Integración
+             </h4>
+             <div class="ctx-badge bg-amber-100 text-amber-800 border-amber-200">ESTADO: BORRADOR</div>
+           </div>
+           
+           <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+               <div class="input-group mb-0">
+                 <label class="input-label bg-transparent">No. Estimación</label>
+                 <input type="number" id="ui_No_Estimacion" value="${est.No_Estimacion}" class="input-field bg-white shadow-sm border-gray-200">
+               </div>
+               <div class="input-group mb-0">
+                 <label class="input-label bg-transparent">Validación</label>
+                 <select id="ui_Estado_Validacion" class="input-field bg-white shadow-sm border-gray-200">
+                   <option value="BORRADOR" selected>BORRADOR</option>
+                   <option value="VALIDADO">VALIDADO</option>
+                 </select>
+               </div>
+               <div class="input-group mb-0 flex items-end">
+                 <input type="hidden" id="ui_Link_Sharepoint" value="">
+                 <button type="button" id="spBtn" onclick="const url = prompt('Ingrese el link de SharePoint para vincular las evidencias de esta estimación:'); if(url) { document.getElementById('ui_Link_Sharepoint').value = url; document.getElementById('spBtnText').innerText = 'Evidencia Vinculada'; this.classList.replace('bg-white', 'bg-blue-50'); this.classList.replace('text-gray-700', 'text-blue-700'); this.classList.replace('border-gray-300', 'border-blue-300'); this.classList.add('shadow-inner'); }" class="w-full h-[42px] bg-white border border-gray-300 hover:border-blue-500 hover:text-blue-600 text-gray-700 rounded-lg text-sm font-semibold shadow-sm transition-all flex items-center justify-center gap-2">
+                   <svg class="w-5 h-5 text-[#0078d4]" fill="currentColor" viewBox="0 0 24 24"><path d="M19.33 10.18a3.48 3.48 0 0 0-3.32-2.31h-2v1.66h2a1.82 1.82 0 0 1 0 3.64h-2.58l-1.46 1.46h4a3.48 3.48 0 0 0 3.36-4.45z"/><path d="M6.33 13.15a1.82 1.82 0 0 1 0-3.64h2.58l1.46-1.46h-4a3.48 3.48 0 0 0 0 6.95h2v-1.66h-2z"/><path d="M9.88 15.54l4.24-4.24-1.18-1.18-4.24 4.24z"/></svg>
+                   <span id="spBtnText">Vincular a SharePoint</span>
+                 </button>
+               </div>
+           </div>
+           
+           <!-- Hidden context fields -->
+           <input type="hidden" id="ui_ID_Contrato" value="${est.ID_Contrato}">
+           <input type="hidden" id="ui_Periodo_Inicio" value="${est.Periodo_Inicio}">
+           <input type="hidden" id="ui_Periodo_Fin" value="${est.Periodo_Fin}">
+           <input type="hidden" id="ui_Monto_Bruto_Estimado" value="${est.Monto_Bruto_Estimado}">
+           <input type="hidden" id="ui_IVA" value="${est.IVA}">
+           <input type="hidden" id="ui_Subtotal" value="${est.Subtotal}">
+           <input type="hidden" id="ui_Deduccion_Surv_05_Monto" value="${est.Deduccion_Surv_05_Monto}">
+           <input type="hidden" id="ui_Monto_Neto_A_Pagar" value="${est.Monto_Neto_A_Pagar}">
+           <input type="hidden" id="ui_Tipo_Estimacion" value="ORDINARIA">
+        </div>
+
+        <div class="md:col-span-2 document-page shadow-none border border-gray-100 mb-6 relative overflow-hidden">
+          <div class="h-1 w-full bg-inst-accent absolute top-0 left-0"></div>
+          <!-- Institutional Header -->
+          <div class="flex justify-between items-start mb-6 pb-4 border-b-2 border-inst-accent/20">
+             <div class="flex items-center gap-4">
+               <!-- Removed per user request -->
+             </div>
+             <div class="text-right">
+               <div class="text-[10px] font-bold text-gray-400 uppercase">Contrato No.</div>
+               <div class="text-sm font-black text-inst-textPrimary">${contrato.Numero_Contrato}</div>
+             </div>
+          </div>
+
+          <!-- Master Data Table -->
+          <table class="w-full text-[10px] mb-6 border-collapse">
+            <tr class="border-b border-gray-100">
+              <td class="py-1 font-bold text-gray-500 w-1/4 uppercase">Empresa:</td>
+              <td class="py-1 text-inst-textPrimary font-bold">${contratista ? contratista.Razon_Social : 'S/N'}</td>
+              <td class="py-1 font-bold text-gray-500 w-1/6 uppercase">R.F.C.:</td>
+              <td class="py-1 text-inst-textPrimary">${contratista ? contratista.RFC : 'S/N'}</td>
+            </tr>
+            <tr class="border-b border-gray-100">
+              <td class="py-1 font-bold text-gray-500 uppercase">Objeto:</td>
+              <td class="py-1 text-inst-textPrimary leading-tight" colspan="3">${contrato.Nombre_Obra || 'Sin descripción'}</td>
+            </tr>
+            <tr>
+              <td class="py-1 font-bold text-gray-500 uppercase">Periodo:</td>
+              <td class="py-1 text-inst-accent font-black">DEL ${est.Periodo_Inicio} AL ${est.Periodo_Fin}</td>
+              <td class="py-1 font-bold text-gray-500 uppercase">Importe Contrato:</td>
+              <td class="py-1 text-inst-textPrimary font-bold text-right">${formatMoney(contrato.Monto_Adjudicado_IVA_Inc)}</td>
+            </tr>
+          </table>
+
+          <!-- Concepts Table -->
+          <table class="doc-table">
+            <thead>
+              <tr>
+                <th rowspan="2">No.</th>
+                <th rowspan="2" class="w-1/3">Conceptos / Descripción</th>
+                <th rowspan="2">Unidad</th>
+                <th rowspan="2">Cant.</th>
+                <th rowspan="2">P. Unitario</th>
+                <th rowspan="2">Asignación Total</th>
+                <th colspan="3">Avances (%)</th>
+                <th colspan="3">Importes ($)</th>
+              </tr>
+              <tr>
+                <th>Ant.</th>
+                <th>Est.</th>
+                <th>Acum.</th>
+                <th>Anterior</th>
+                <th>Estimación</th>
+                <th>Acumulado</th>
+              </tr>
+            </thead>
+            <tbody>`;
+
+      window.currentCaratulaDetails = [];
+
+      concepts.forEach((c, idx) => {
+        // Calculate historicals for this specific concept
+        // (This would ideally require Detalle_Estimacion linkage, for now we draft from Program)
+        const prog = (DB['Programa_Ejecucion'] || []).find(p => p.ID_Concepto == c.ID_Concepto && p.Fecha_Inicio == est.Periodo_Inicio);
+        const montoEst = prog ? parseFloat(prog.Monto_Programado) : 0;
+        const pctEst = prog ? parseFloat(prog.Avance_Programado_Pct) : 0;
+
+        // Mocking history for the draft preview
+        const montoAnt = 0; // Logic for real sums from previous ests would go here
+        const pctAnt = 0;
+        const montoAcum = montoAnt + montoEst;
+        const pctAcum = pctAnt + pctEst;
+        const asignacion = parseFloat(c.Importe_Total_Sin_IVA) || 0;
+
+        // Only push delta records where progress or amount is actually happening
+        if (montoEst > 0 || pctEst > 0) {
+          window.currentCaratulaDetails.push({
+            ID_Concepto: c.ID_Concepto,
+            Importe_Este_Periodo: montoEst.toFixed(2),
+            Porcentaje_Avance_Este_Periodo: pctEst.toFixed(2),
+            Importe_Acumulado: montoAcum.toFixed(2),
+            Porcentaje_Avance_Acumulado: pctAcum.toFixed(2)
+          });
+        }
+
+        html += `
+          <tr class="hover:bg-gray-50">
+            <td class="center font-bold">${idx + 1}</td>
+            <td class="leading-tight text-[11px]">${c.Descripcion}</td>
+            <td class="center font-medium">${c.Unidad}</td>
+            <td class="center">${formatMoney(c.Cantidad_Contratada || 0).replace('$', '')}</td>
+            <td class="monto font-medium">${formatMoney(c.Precio_Unitario)}</td>
+            <td class="monto font-bold">${formatMoney(asignacion)}</td>
+            <td class="center font-medium">${pctAnt.toFixed(2)}%</td>
+            <td class="center font-bold text-inst-accent">${pctEst.toFixed(2)}%</td>
+            <td class="center font-medium">${pctAcum.toFixed(2)}%</td>
+            <td class="monto text-gray-400">${formatMoney(montoAnt)}</td>
+            <td class="monto font-bold text-blue-700 bg-blue-50/50">${formatMoney(montoEst)}</td>
+            <td class="monto font-bold">${formatMoney(montoAcum)}</td>
+          </tr>`;
+      });
+
+      html += `
+            </tbody>
+          </table>
+
+          <!-- Financial Summary -->
+          <div class="doc-summary border-2 border-gray-200">
+            <table>
+              <tr><td class="label">Importe Estimación</td><td class="val">${formatMoney(est.Monto_Bruto_Estimado)}</td></tr>
+              <tr><td class="label">I.V.A. (16%)</td><td class="val">${formatMoney(est.IVA)}</td></tr>
+              <tr><td class="label">Subtotal</td><td class="val font-black block w-full bg-gray-50">${formatMoney(est.Subtotal)}</td></tr>
+              <tr><td class="label text-rose-700">Deducciones (${contrato.Retencion_Vigilancia_Pct || '0.5'}%)</td><td class="val text-rose-700">-${formatMoney(est.Deduccion_Surv_05_Monto)}</td></tr>
+              <tr><td class="label bg-inst-accent text-white">Líquido a Pagar</td><td class="val bg-inst-accent/10 text-xl font-black text-inst-accent">${formatMoney(est.Monto_Neto_A_Pagar)}</td></tr>
+            </table>
+          </div>
+          <div class="clear-both"></div>
+        </div>
+      `;
+
+      modalPortal.innerHTML = html;
+
+      // Ensure modal is shown
+      const m = document.getElementById('formModal');
+      m.classList.remove('hidden');
+      m.classList.add('flex');
+      document.getElementById('formModalPanel').classList.add('modal-enter-active');
+
+      // Override current table for save
+      currentContextualTable = 'Estimaciones';
+      isEditing = false;
+    }
+
+    function showVerificationReport() {
+      const idContrato = window.currentExpedienteId;
+      if (!idContrato) return;
+
+      const programa = (DB['Programa_Ejecucion'] || []).filter(p => {
+        const c = (DB['Catalogo_Conceptos'] || []).find(cc => cc.ID_Concepto == p.ID_Concepto);
+        return c && c.ID_Contrato == idContrato;
+      });
+
+      const ests = (DB['Estimaciones'] || []).filter(e => e.ID_Contrato == idContrato);
+      const detalles = (DB['Detalle_Estimacion'] || []).filter(d => {
+        return ests.some(e => e.ID_Estimacion == d.ID_Estimacion);
+      });
+
+      const totalProgramado = programa.reduce((sum, p) => sum + (parseFloat(p.Monto_Programado) || 0), 0);
+      const totalEstimado = ests.reduce((sum, e) => sum + (parseFloat(e.Monto_Bruto_Estimado) || 0), 0);
+
+      const estColorClass = totalEstimado > totalProgramado ? 'text-red-600' : 'text-inst-gold';
+
+      let reportHtml = `
+        <div class="space-y-6 max-h-[70vh] overflow-y-auto px-1">
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="bg-blue-50/50 p-4 rounded-xl border border-blue-100">
+              <div class="text-[10px] text-blue-500 uppercase font-black">Monto Programado</div>
+              <div class="text-xl font-bold text-blue-900">${formatMoney(totalProgramado)}</div>
+            </div>
+            <div class="bg-inst-gold/5 p-4 rounded-xl border border-inst-gold/10">
+              <div class="text-[10px] text-inst-gold uppercase font-black">Monto Estimado</div>
+              <div class="text-xl font-bold ${estColorClass}">${formatMoney(totalEstimado)}</div>
+            </div>
+            <div class="bg-gray-50 p-4 rounded-xl border border-gray-200">
+              <div class="text-[10px] text-gray-500 uppercase font-black">Diferencia / Saldo</div>
+              <div class="text-xl font-bold text-gray-600">${formatMoney(totalProgramado - totalEstimado)}</div>
+            </div>
+          </div>
+      `;
+
+      if (totalEstimado > totalProgramado) {
+        reportHtml += `
+          <div class="bg-red-50 border border-red-200 p-4 rounded-lg flex items-start gap-3">
+            <svg class="w-6 h-6 text-red-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+            <div>
+              <p class="font-bold text-red-800 text-xs">ALERTA CRÍTICA: SOBREESTIMACIÓN</p>
+              <p class="text-xs text-red-600">El total acumulado estimado excede el presupuesto programado. Revisa los conceptos individuales.</p>
+            </div>
+          </div>`;
+      }
+
+      reportHtml += `
+        <div class="overflow-hidden rounded-xl border border-gray-200">
+          <table class="w-full text-left text-[11px]">
+            <thead class="bg-gray-50 text-gray-500 uppercase font-bold">
+              <tr>
+                <th class="px-4 py-2">Clave Concepto</th>
+                <th class="px-4 py-2 text-right">Prog. Total</th>
+                <th class="px-4 py-2 text-right">Est. Acum.</th>
+                <th class="px-4 py-2 text-right">Estatus</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-100 bg-white">
+      `;
+
+      (DB['Catalogo_Conceptos'] || []).filter(c => c.ID_Contrato == idContrato).forEach(c => {
+        const pVal = programa.filter(p => p.ID_Concepto == c.ID_Concepto).reduce((sum, p) => sum + (parseFloat(p.Monto_Programado) || 0), 0);
+        const eVal = detalles.filter(d => d.ID_Concepto == c.ID_Concepto).reduce((sum, d) => sum + (parseFloat(d.Importe_Este_Periodo) || 0), 0);
+
+        let badge = '<span class="text-green-500 font-bold">✓</span>';
+        if (eVal > pVal) badge = '<span class="px-2 py-0.5 bg-red-100 text-red-600 rounded font-bold">EXCEDE</span>';
+        else if (eVal === 0 && pVal > 0) badge = '<span class="text-gray-300">PDTE</span>';
+
+        const rowClass = eVal > pVal ? 'bg-red-50/50' : '';
+
+        reportHtml += `
+          <tr class="${rowClass}">
+            <td class="px-4 py-2"><div class="font-bold">${c.Clave}</div><div class="text-[9px] text-gray-400 truncate max-w-[150px]">${c.Descripcion}</div></td>
+            <td class="px-4 py-2 text-right">${formatMoney(pVal)}</td>
+            <td class="px-4 py-2 text-right font-bold">${formatMoney(eVal)}</td>
+            <td class="px-4 py-2 text-right">${badge}</td>
+          </tr>
+        `;
+      });
+
+      reportHtml += `</tbody></table></div></div>`;
+
+      // Update Generic Modal to act as Report
+      const grid = document.getElementById('formFieldsGrid');
+      grid.innerHTML = reportHtml;
+      document.getElementById('formModalTitle').innerText = "Validación Financiera del Proyecto";
+      document.getElementById('formSaveBtn').classList.add('hidden');
+      document.getElementById('btnAiContextual').classList.add('hidden');
+
+      const m = document.getElementById('formModal');
+      m.classList.remove('hidden');
+      m.classList.add('flex');
+    }
+
+    function saveDynamicRecord(e) {
+      e.preventDefault();
+      showLoader("Guardando en la Base de Datos...");
+
+      // Use currentContextualTable tracked when the modal was opened
+      const targetTable = currentContextualTable || activeTableName;
+      const headers = SCHEMA[targetTable];
+
+      const obj = {};
+      headers.forEach(h => {
+        const el = document.getElementById(`ui_${h}`);
+        if (el) obj[h] = el.value; // This elegantly captures disabled fields too!
+      });
+
+      // INJECT DETAILS FOR NEW ESTIMACION (Send as Safe Base64 string to prevent payload syntax errors)
+      if (targetTable === 'Estimaciones' && window.currentCaratulaDetails && window.currentCaratulaDetails.length > 0 && !isEditing) {
+        try {
+          const jsonStr = JSON.stringify(window.currentCaratulaDetails);
+          // Base64 encode the string to safely bypass Google Apps Script Payload serialization bugs
+          obj._Detalles = btoa(unescape(encodeURIComponent(jsonStr)));
+        } catch (e) {
+          console.error("Error codificando detalles:", e);
+        }
+      }
+
+      // Visual Spinner Button Logic
+      const saveBtn = document.getElementById('formSaveBtn');
+      const originalBtnText = saveBtn ? saveBtn.innerHTML : '';
+      if (saveBtn) {
+        saveBtn.disabled = true;
+        saveBtn.innerHTML = '<svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white inline-block" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> Guardando...';
+      }
+
+      const restoreBtn = () => {
+        if (saveBtn) {
+          saveBtn.disabled = false;
+          saveBtn.innerHTML = originalBtnText;
+        }
+      };
+
+      if (isEditing) {
+        obj[editPkField] = editPkValue; // ensure PK isn't lost
+        const cond = {}; cond[editPkField] = editPkValue;
+        google.script.run
+          .withSuccessHandler(res => { restoreBtn(); handleCrudSuccess(res, targetTable); })
+          .withFailureHandler(err => { restoreBtn(); hideLoader(); toast("Error: " + err.message, "error"); })
+          .dbUpdate(targetTable, obj, cond);
+      } else {
+        google.script.run
+          .withSuccessHandler(res => { restoreBtn(); handleCrudSuccess(res, targetTable); })
+          .withFailureHandler(err => { restoreBtn(); hideLoader(); toast("Error: " + err.message, "error"); })
+          .dbInsert(targetTable, obj);
+      }
+    }
+
+    function deleteContextual(tableName, id) {
+      if (confirm(`¿Desea ELIMINAR definitivamente de ${tableName} la clave [${id}]?`)) {
+        showLoader("Borrando...");
+        const cond = {}; cond[SCHEMA[tableName][0]] = id;
+        google.script.run
+          .withSuccessHandler(res => { handleCrudSuccess({ success: true }, tableName); })
+          .withFailureHandler(err => { hideLoader(); toast(err, "error"); })
+          .dbDelete(tableName, cond);
+      }
+    }
+
+    // --- CASCADING DELETE LOGIC ---
+    function deleteRecordCascade(tableName, id) {
+      if (!confirm(`⚠️ ATENCIÓN: Estás a punto de eliminar el registro ID ${id} de la tabla ${tableName}.\n\nSi borras un CONTRATO, se borrarán TAMBIÉN todas sus Estimaciones, Facturas, Anticipos y Catálogos vinculados permanentemente.\n\n¿Estás completamente seguro?`)) {
+        return;
+      }
+
+      showLoader("Eliminando y pulgando dependencias...");
+      const pkName = SCHEMA[tableName][0];
+      const cond = {};
+      cond[pkName] = id;
+
+      google.script.run
+        .withSuccessHandler(res => {
+          if (res.success) {
+            // We bypass standard view-reload and do a hard reload because a cascade delete touches multi-tables.
+            toast(`Proyecto purgado con éxito. ${res.rowsDeleted} filas afectadas.`);
+            currentContextualTable = null; // reset context
+            preloadData();
+          } else {
+            hideLoader(); toast("Error: " + res.message, "error");
+          }
+        })
+        .withFailureHandler(err => { hideLoader(); toast(err.message, "error"); })
+        .dbDeleteCascade(tableName, cond);
+    }
+
+    function handleCrudSuccess(res, tableName) {
+      hideLoader();
+      closeFormModal();
+      toast("Operación de escritura exitosa.");
+
+      // Force reload table data in background to sync DB object and re-paint active view
+      google.script.run.withSuccessHandler(data => {
+        DB[tableName] = data;
+        if (currentView === 'dashboard') buildDashboard();
+        if (currentView === 'proyectos') buildProjectsGrid();
+        if (currentView === 'expediente' && window.currentExpedienteId) loadExpediente(window.currentExpedienteId);
+        if (currentView === 'explorer' && activeTableName === tableName) renderExplorerGrid(tableName, data);
+      }).dbSelect(tableName, {});
+    }
+</script>

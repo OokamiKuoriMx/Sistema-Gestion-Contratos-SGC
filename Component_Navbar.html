@@ -1,0 +1,53 @@
+<!-- ==================== SIDEBAR ==================== -->
+  <aside class="w-64 bg-inst-sidebar text-white shadow-xl flex flex-col transition-all duration-300 z-20" id="sidebar">
+    <div class="h-16 flex items-center justify-center border-b border-gray-700/50 bg-black/20">
+      <div class="flex items-center gap-3">
+        <div class="w-8 h-8 rounded bg-inst-accent flex items-center justify-center text-white font-bold shadow-lg">S
+        </div>
+        <span class="font-bold text-lg tracking-wide">SGC Admin</span>
+      </div>
+    </div>
+
+    <div class="flex-1 overflow-y-auto py-6 px-3 flex flex-col gap-1">
+      <div class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 px-3">Principal</div>
+
+      <button onclick="navigate('dashboard')" id="nav-dashboard"
+        class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors hover:bg-inst-sidebarHover hover:text-white mb-1">
+        <svg fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 opacity-70">
+          <path stroke-linecap="round" stroke-linejoin="round"
+            d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" />
+        </svg>
+        Dashboard
+      </button>
+
+      <button onclick="navigate('proyectos')" id="nav-proyectos"
+        class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors text-gray-400 hover:bg-inst-sidebarHover hover:text-white mb-1">
+        <svg fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 opacity-70">
+          <path stroke-linecap="round" stroke-linejoin="round"
+            d="M8.25 21v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21m0 0h4.5V3.545M12.75 21h7.5V10.75M2.25 21h1.5m18 0h-18M2.25 9l4.5-1.636M18.75 3l-1.5.545m0 6.205l3 1m1.5.5l-1.5-.5M6.75 7.364V3h-3v18m3-13.636l10.5-3.819" />
+        </svg>
+        Proyectos (Contratos)
+      </button>
+
+      <div class="text-xs font-semibold text-gray-500 uppercase tracking-wider mt-6 mb-2 px-3">Datos & IA</div>
+
+      <button onclick="navigate('explorer')" id="nav-explorer"
+        class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors text-gray-400 hover:bg-inst-sidebarHover hover:text-white mb-1">
+        <svg fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 opacity-70">
+          <path stroke-linecap="round" stroke-linejoin="round"
+            d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375m16.5 0v3.75m-16.5-3.75v3.75m16.5 0v3.75C20.25 16.153 16.556 18 12 18s-8.25-1.847-8.25-4.125v-3.75m16.5 0c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125" />
+        </svg>
+        Explorador Maestro
+      </button>
+
+      <button onclick="openUploadModal()"
+        class="w-full mt-4 flex items-center justify-center gap-2 px-3 py-3 rounded-lg text-sm font-bold transition-all bg-gradient-to-r from-inst-accent to-inst-accentLight shadow-lg hover:shadow-inst-accent/30 hover:-translate-y-0.5 text-white">
+        <svg fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
+          <path stroke-linecap="round" stroke-linejoin="round"
+            d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09l2.846.813-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z" />
+        </svg>
+        Auto-Ingesta IA
+      </button>
+
+    </div>
+  </aside>

@@ -1,0 +1,99 @@
+<!-- ==================== MODALS ==================== -->
+
+  <!-- Universal Form Modal -->
+  <div id="formModal" class="fixed inset-0 z-[100] hidden items-center justify-center">
+    <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onclick="closeFormModal()"></div>
+    <div
+      class="bg-white rounded-xl shadow-2xl w-full max-w-2xl z-10 mx-4 flex flex-col max-h-[90vh] overflow-hidden transform transition-all modal-enter"
+      id="formModalPanel">
+      <div class="h-2 w-full bg-gradient-to-r from-inst-accent to-inst-gold shrink-0"></div>
+
+      <div class="px-6 py-5 border-b border-gray-100 flex justify-between items-center shrink-0">
+        <div class="flex items-center gap-4">
+          <h3 class="text-xl font-bold text-inst-textPrimary" id="formModalTitle">Editar Registro</h3>
+          <button id="btnAiContextual" onclick="openContextualAi()"
+            class="hidden text-xs font-bold bg-inst-accent/10 text-inst-accent hover:bg-inst-accent hover:text-white px-3 py-1.5 rounded-full transition-colors flex items-center gap-1 border border-inst-accent/20">
+            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+            </svg>
+            Auto-llenar con IA
+          </button>
+        </div>
+        <button onclick="closeFormModal()" class="text-gray-400 hover:text-gray-600 transition-colors p-1"><svg
+            class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+          </svg></button>
+      </div>
+
+      <div class="p-6 overflow-y-auto custom-scrollbar flex-1 bg-gray-50/30">
+        <form id="dynamicForm" onsubmit="saveDynamicRecord(event)">
+          <div id="formFieldsGrid" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <!-- JS Injects inputs here -->
+          </div>
+
+          <div class="mt-8 flex justify-end gap-3 pt-4 border-t border-gray-200">
+            <button type="button" onclick="closeFormModal()"
+              class="px-5 py-2.5 rounded-lg border border-gray-300 bg-white text-sm font-semibold text-gray-700 hover:bg-gray-50">Cancelar</button>
+            <button type="submit" id="formSaveBtn"
+              class="px-6 py-2.5 rounded-lg border border-transparent bg-inst-accent text-sm font-semibold text-white shadow-md hover:bg-inst-accentLight">Guardar</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Upload IA Modal -->
+  <div id="uploadModal" class="fixed inset-0 z-[100] hidden items-center justify-center">
+    <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onclick="closeUploadModal()"></div>
+    <div class="bg-white rounded-xl shadow-2xl w-full max-w-lg z-10 mx-4 transform transition-all modal-enter"
+      id="uploadModalPanel">
+      <div class="p-8 text-center flex flex-col items-center">
+        <div class="w-16 h-16 bg-inst-accent/10 rounded-full flex items-center justify-center mb-6">
+          <svg class="w-8 h-8 text-inst-accent" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+          </svg>
+        </div>
+        <h3 class="text-2xl font-bold text-inst-textPrimary mb-2">Procesamiento de IA</h3>
+
+        <label id="dropzone" for="aiFile"
+          class="w-full relative border-2 border-dashed border-gray-300 rounded-xl p-8 hover:border-inst-gold hover:bg-inst-gold/5 cursor-pointer transition-all group mb-6">
+          <input type="file" id="aiFile" class="hidden" accept=".pdf,.doc,.docx"
+            onchange="handleAiFileSelect(this.files)">
+          <svg class="w-10 h-10 text-gray-400 group-hover:text-inst-gold mx-auto mb-3 transition-colors" fill="none"
+            viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+              d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+          </svg>
+          <span class="block text-sm font-semibold text-gray-700" id="fileName">Arrastra aquí tu Documento o Haz
+            Clic</span>
+        </label>
+
+        <div class="flex gap-3 w-full">
+          <button onclick="closeUploadModal()"
+            class="flex-1 py-3 rounded-lg border border-gray-200 font-semibold text-gray-600 hover:bg-gray-50">Cancelar</button>
+          <button id="aiSubmitBtn" onclick="runAI()"
+            class="flex-1 py-3 rounded-lg bg-inst-gold hover:bg-[#977848] text-white font-semibold shadow-md transition-colors flex items-center justify-center gap-2">
+            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+            </svg>
+            Procesar
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notifier -->
+  <div id="toast"
+    class="fixed top-6 right-6 z-[200] transform transition-all duration-300 translate-x-10 opacity-0 bg-white shadow-xl rounded-lg border-l-4 border-inst-accent flex overflow-hidden pointer-events-none">
+    <div class="px-4 py-3 flex items-center gap-3">
+      <div id="toastIcon" class="text-inst-accent"><svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+          <path fill-rule="evenodd"
+            d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+            clip-rule="evenodd" />
+        </svg></div>
+      <span id="toastMsg" class="text-sm font-medium text-gray-800">Mensaje</span>
+    </div>
+  </div>

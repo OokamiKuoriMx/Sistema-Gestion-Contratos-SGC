@@ -1,0 +1,215 @@
+<style>
+    /* CSS Base & Utilities */
+    body {
+      background-color: #f8fafc;
+      overflow-x: hidden;
+    }
+
+    .view-section {
+      display: none;
+      animation: fadeIn 0.3s ease-out;
+    }
+
+    .view-section.active {
+      display: block;
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(10px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    /* Elegant Scrollers */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 4px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+
+    /* Modals fade effects */
+    .modal-enter {
+      opacity: 0;
+      transform: scale(0.97) translateY(10px);
+    }
+
+    .modal-enter-active {
+      opacity: 1;
+      transform: scale(1) translateY(0);
+      transition: opacity 250ms ease-out, transform 250ms ease-out;
+    }
+
+    .modal-exit {
+      opacity: 0;
+      transition: opacity 200ms ease-in;
+      pointer-events: none;
+    }
+
+    /* Floating Inputs */
+    .input-group {
+      position: relative;
+      margin-bottom: 20px;
+    }
+
+    .input-field {
+      width: 100%;
+      padding: 10px 14px;
+      border: 1px solid #e2e8f0;
+      border-radius: 6px;
+      font-size: 14px;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+      background: white;
+    }
+
+    .input-field:focus {
+      border-color: #8b1935;
+      box-shadow: 0 0 0 3px rgba(139, 25, 53, 0.1);
+    }
+
+    .input-label {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      color: #475569;
+      margin-bottom: 6px;
+    }
+
+    /* Premium Financial Inputs */
+    .currency-input-wrapper {
+      position: relative;
+    }
+
+    .currency-input-wrapper::before {
+      content: '$';
+      position: absolute;
+      left: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #94a3b8;
+      font-weight: 600;
+      font-size: 14px;
+      pointer-events: none;
+    }
+
+    .currency-input-wrapper .input-field {
+      padding-left: 28px;
+      text-align: right;
+      font-family: 'Inter', monospace;
+      font-weight: 500;
+    }
+
+    /* Metadata Badges */
+    .ctx-badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 4px 12px;
+      background: #f1f5f9;
+      border: 1px solid #e2e8f0;
+      border-radius: 9999px;
+      font-size: 11px;
+      font-weight: 700;
+      color: #475569;
+      text-transform: uppercase;
+      letter-spacing: 0.025em;
+    }
+
+    .ctx-badge-accent {
+      background: #fff1f2;
+      border-color: #fecdd3;
+      color: #9f1239;
+    }
+
+    /* Estimation Carátula Styles */
+    .document-page {
+      background: white;
+      box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+      padding: 1.5rem;
+      border-radius: 4px;
+      font-family: 'Inter', sans-serif;
+      color: #1e293b;
+      line-height: 1.4;
+      width: 100%;
+      margin: 0 auto;
+    }
+
+    .doc-header-table td {
+      vertical-align: top;
+      padding: 4px 8px;
+    }
+
+    .doc-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 10px;
+      margin-top: 1rem;
+    }
+
+    .doc-table th,
+    .doc-table td {
+      border: 1px solid #cbd5e1;
+      padding: 4px 6px;
+    }
+
+    .doc-table th {
+      background: #f8fafc;
+      font-weight: 700;
+      text-transform: uppercase;
+      text-align: center;
+    }
+
+    .doc-table td.monto {
+      text-align: right;
+      font-family: 'Inter', monospace;
+    }
+
+    .doc-table td.center {
+      text-align: center;
+    }
+
+    .doc-summary {
+      width: 300px;
+      float: right;
+      margin-top: 1rem;
+      font-size: 11px;
+    }
+
+    .doc-summary table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    .doc-summary td {
+      padding: 4px 8px;
+      border: 1px solid #e2e8f0;
+    }
+
+    .doc-summary td.label {
+      font-weight: 700;
+      background: #f1f5f9;
+      text-transform: uppercase;
+    }
+
+    .doc-summary td.val {
+      text-align: right;
+      font-weight: 700;
+    }
+  </style>

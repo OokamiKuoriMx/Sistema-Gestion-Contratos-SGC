@@ -1,0 +1,376 @@
+<!-- ==================== MAIN LAYOUT ==================== -->
+  <main class="flex-1 flex flex-col h-full bg-inst-bgLight relative overflow-hidden">
+
+    <!-- Top Header Bar -->
+    <header
+      class="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6 shadow-sm z-10 shrink-0">
+      <h2 class="text-xl font-bold text-inst-textPrimary tracking-tight" id="headerTitle">Visión General</h2>
+      <div class="flex items-center gap-4">
+        <div class="text-sm font-medium text-inst-textSecondary" id="dbStatusBadge">
+          <span class="inline-flex items-center gap-1.5"><span
+              class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span> DB Iniciando</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Scrollable Content Area -->
+    <div class="flex-1 overflow-y-auto w-full relative">
+
+      <!-- GLOBAL LOADER -->
+      <div id="globalLoader"
+        class="absolute inset-0 bg-white/80 backdrop-blur-sm z-50 flex flex-col items-center justify-center hidden transition-opacity">
+        <svg class="animate-spin h-10 w-10 text-inst-accent mb-4" xmlns="http://www.w3.org/2000/svg" fill="none"
+          viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor"
+            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+          </path>
+        </svg>
+        <span class="text-gray-600 font-medium" id="loaderMsg">Procesando...</span>
+      </div>
+
+      <!-- VIEW 1: DASHBOARD -->
+      <section id="view-dashboard" class="view-section active p-6 max-w-7xl mx-auto">
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <div class="bg-white rounded-xl shadow-soft p-6 border border-gray-100 flex flex-col">
+            <span class="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-2">Total Contratos</span>
+            <span class="text-3xl font-bold text-inst-accent" id="kpiContratos">0</span>
+            <span
+              class="text-xs text-green-600 font-medium mt-2 bg-green-50 px-2 py-1 rounded inline-flex w-max items-center gap-1"><svg
+                class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+              </svg> Activos en DB</span>
+          </div>
+          <div class="bg-white rounded-xl shadow-soft p-6 border border-gray-100 flex flex-col">
+            <span class="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-2">Compromiso Total ($)</span>
+            <span class="text-3xl font-bold text-inst-textPrimary" id="kpiMonto">$0.00</span>
+            <span class="text-xs text-gray-500 font-medium mt-2">Monto sumado de proyectos</span>
+          </div>
+          <div
+            class="bg-white rounded-xl shadow-soft p-6 border border-gray-100 flex flex-col relative overflow-hidden group">
+            <div
+              class="absolute right-0 top-0 w-24 h-24 bg-inst-accent/5 rounded-bl-full -mr-8 -mt-8 transition-transform group-hover:scale-110">
+            </div>
+            <span class="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-2">Contratistas</span>
+            <span class="text-3xl font-bold text-inst-gold" id="kpiContratistas">0</span>
+            <span class="text-xs text-gray-500 font-medium mt-2 cursor-pointer hover:text-inst-accent"
+              onclick="navigate('explorer')">Ver directorio completo &rarr;</span>
+          </div>
+        </div>
+
+        <div class="bg-white rounded-xl shadow-soft border border-gray-100 overflow-hidden">
+          <div class="px-6 py-5 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+            <h3 class="font-bold text-lg text-inst-textPrimary">Proyectos Recientes</h3>
+            <button onclick="navigate('proyectos')"
+              class="text-sm font-medium text-inst-accent hover:text-inst-accentLight transition-colors">Ver
+              todos</button>
+          </div>
+          <div class="overflow-x-auto">
+            <table class="w-full text-left border-collapse">
+              <thead>
+                <tr class="text-xs font-semibold text-gray-500 border-b border-gray-100 uppercase tracking-wider">
+                  <th class="px-6 py-3">Número / Referencia</th>
+                  <th class="px-6 py-3">Empresa</th>
+                  <th class="px-6 py-3 text-right">Monto (IVA Inc.)</th>
+                  <th class="px-6 py-3 text-center">Fechas</th>
+                </tr>
+              </thead>
+              <tbody id="dashboardRecentBody" class="divide-y divide-gray-100 text-sm">
+                <tr>
+                  <td colspan="4" class="px-6 py-10 text-center text-gray-400">Cargando datos relacionales...</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- VIEW 2: PROYECTOS (LISTA DE CONTRATOS ENRIQUECIDA) -->
+      <section id="view-proyectos" class="view-section hidden p-6 max-w-7xl mx-auto h-full flex flex-col">
+        <div class="flex justify-between items-end mb-6 shrink-0">
+          <div>
+            <p class="text-sm text-gray-500 max-w-2xl">Administra los expedientes de obra. Haz clic en un proyecto para
+              ver sus estimaciones, facturas y pagos vinculados o crear uno nuevo.</p>
+          </div>
+          <button onclick="openFormModal('Contratos')"
+            class="bg-inst-accent hover:bg-inst-accentLight text-white px-4 py-2 rounded-lg text-sm font-semibold shadow transition-colors flex items-center gap-2">
+            <svg fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+            </svg>
+            Nuevo Proyecto
+          </button>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 overflow-y-auto pb-10" id="projectsGrid">
+          <!-- Project Cards generated by JS -->
+          <div class="col-span-full py-20 text-center text-gray-400">Construyendo listado de Obras...</div>
+        </div>
+      </section>
+
+      <!-- VIEW: EXPEDIENTE DE OBRA (DRILL-DOWN) -->
+      <section id="view-expediente" class="view-section hidden p-6 max-w-7xl mx-auto h-full flex flex-col gap-6">
+        <!-- Expediente Header Nav -->
+        <div class="flex items-center gap-4 mb-2 shrink-0">
+          <button onclick="navigate('proyectos')"
+            class="flex items-center gap-2 text-sm font-semibold text-gray-500 hover:text-inst-accent transition-colors bg-white border border-gray-200 hover:border-inst-accent rounded-lg px-3 py-1.5 shadow-sm">
+            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+            </svg>
+            Volver
+          </button>
+          <h2 id="expTitle" class="text-2xl font-bold text-inst-textPrimary truncate flex-1">Cargando Expediente...</h2>
+          <span id="expStatusBadge"
+            class="hidden md:inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-green-100 text-green-800 border border-green-200 whitespace-nowrap">Vigente</span>
+        </div>
+
+        <!-- Expediente Quick Stats Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 shrink-0">
+          <!-- Monto Total -->
+          <div
+            class="bg-white rounded-xl shadow-sm border border-gray-200 p-5 flex flex-col justify-center relative overflow-hidden group">
+            <div
+              class="absolute right-0 top-0 w-16 h-16 bg-inst-accent/5 rounded-bl-[100%] transition-transform group-hover:scale-110">
+            </div>
+            <p class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Monto Total Contratado</p>
+            <h3 id="expMontoTotal" class="text-2xl font-black text-gray-900">$0.00</h3>
+          </div>
+          <!-- Total Pagado -->
+          <div
+            class="bg-white rounded-xl shadow-sm border border-gray-200 p-5 flex flex-col justify-center relative overflow-hidden group">
+            <div
+              class="absolute right-0 top-0 w-16 h-16 bg-green-500/5 rounded-bl-[100%] transition-transform group-hover:scale-110">
+            </div>
+            <p class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Fondo Amortizado / Pagado</p>
+            <h3 id="expTotalPagado" class="text-2xl font-black text-green-600">$0.00</h3>
+          </div>
+          <!-- Saldo Pendiente -->
+          <div
+            class="bg-white rounded-xl shadow-sm border border-gray-200 p-5 flex flex-col justify-center relative overflow-hidden group">
+            <div
+              class="absolute right-0 top-0 w-16 h-16 bg-orange-500/5 rounded-bl-[100%] transition-transform group-hover:scale-110">
+            </div>
+            <p class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Saldo Pendiente</p>
+            <h3 id="expSaldo" class="text-2xl font-black text-orange-500">$0.00</h3>
+          </div>
+          <!-- Progreso Financiero -->
+          <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-5 flex flex-col justify-center">
+            <div class="flex justify-between items-end mb-2">
+              <p class="text-xs font-bold text-gray-500 uppercase tracking-wider">Avance Financiero</p>
+              <span id="expProgresoText" class="text-lg font-black text-inst-accent">0%</span>
+            </div>
+            <div class="w-full bg-gray-100 rounded-full h-2.5 overflow-hidden">
+              <div id="expProgresoBar" class="bg-inst-accent h-2.5 rounded-full transition-all duration-1000"
+                style="width: 0%"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Expediente Main Content Area (Tabs) -->
+        <div
+          class="bg-white rounded-xl shadow-sm border border-gray-200 flex-1 flex flex-col overflow-hidden min-h-[400px]">
+          <!-- Tab Headers -->
+          <div class="flex border-b border-gray-200 bg-gray-50/50 overflow-x-auto custom-scrollbar">
+            <button id="btnTabDatos" onclick="switchExpedienteTab('datos')"
+              class="exp-tab-btn active px-6 py-3.5 text-sm font-bold border-b-2 border-inst-accent text-inst-accent whitespace-nowrap transition-colors">Datos
+              Generales</button>
+            <button id="btnTabCatalogo" onclick="switchExpedienteTab('catalogo')"
+              class="exp-tab-btn px-6 py-3.5 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-100 whitespace-nowrap transition-colors">Catálogo
+              de Conceptos</button>
+            <button id="btnTabPrograma" onclick="switchExpedienteTab('programa')"
+              class="exp-tab-btn px-6 py-3.5 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-100 whitespace-nowrap transition-colors">Programa
+              de Ejecución</button>
+            <button id="btnTabEstimaciones" onclick="switchExpedienteTab('estimaciones')"
+              class="exp-tab-btn px-6 py-3.5 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-100 whitespace-nowrap transition-colors">Registro
+              de Estimaciones</button>
+            <button id="btnTabConvenios" onclick="switchExpedienteTab('convenios')"
+              class="exp-tab-btn px-6 py-3.5 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-100 whitespace-nowrap transition-colors">Convenios
+              y Anticipos</button>
+          </div>
+
+          <!-- Tab Content 1: Datos Generales -->
+          <div id="tab-exp-datos"
+            class="exp-tab-content p-6 flex-1 overflow-y-auto custom-scrollbar bg-gray-50/20 active">
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <!-- JS will inject read-only form data here based on the contract -->
+              <div id="expDatosContainer" class="col-span-1 lg:col-span-2 space-y-4">
+                <div class="text-center text-gray-400 py-10 font-medium">Cargando datos del contrato...</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tab Content 2: Programa de Ejecución -->
+          <div id="tab-exp-programa"
+            class="exp-tab-content hidden p-0 flex-1 overflow-hidden bg-white flex-col relative w-full">
+            <div class="bg-gray-50 px-6 py-4 border-b border-gray-200 flex justify-between items-center shrink-0">
+              <div>
+                <h3 class="font-bold text-gray-800">Programa de Ejecución</h3>
+                <p class="text-xs text-gray-500">Cronograma de inversión y metas físicas.</p>
+              </div>
+              <div>
+                <input type="file" id="fileProgExcel" accept=".xlsx, .xls, .csv, .pdf" class="hidden"
+                  onchange="handleExcelUpload(event, 'Programa_Ejecucion')">
+                <button onclick="document.getElementById('fileProgExcel').click()"
+                  class="text-xs font-bold bg-inst-gold text-white hover:bg-[#977848] px-3 py-2 rounded-lg transition-colors flex items-center gap-1.5 shadow-sm">
+                  <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                  </svg>
+                  Importar Programa
+                </button>
+              </div>
+            </div>
+            <div class="overflow-auto flex-1 custom-scrollbar w-full relative">
+              <table class="w-full relative text-left whitespace-nowrap">
+                <thead class="bg-gray-100 sticky top-0 z-10 shadow-sm text-xs text-gray-500 uppercase">
+                  <tr id="tblProgramaHead">
+                    <th class="px-4 py-2">No. Programa</th>
+                    <th class="px-4 py-2">Periodo</th>
+                    <th class="px-4 py-2 text-right">Monto Prog.</th>
+                    <th class="px-4 py-2 text-right">Avance (%)</th>
+                  </tr>
+                </thead>
+                <tbody id="tblProgramaBody" class="divide-y divide-gray-100 text-sm">
+                  <tr>
+                    <td colspan="4" class="px-6 py-10 text-center text-gray-400">No hay programa cargado.</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Tab Content 3: Registro de Estimaciones -->
+          <div id="tab-exp-estimaciones"
+            class="exp-tab-content hidden p-6 flex-1 overflow-y-auto custom-scrollbar bg-gray-50/20 flex-col relative w-full">
+            <div class="flex justify-between items-end mb-6">
+              <div>
+                <h3 class="font-bold text-gray-800 text-lg">Registro de Estimaciones</h3>
+                <p class="text-sm text-gray-500">Estimaciones, Facturas y Pagos ligados a este proyecto.</p>
+              </div>
+              <div class="flex gap-2">
+                <!-- Advanced Verification Report Button -->
+                <button id="btnVerificarEstimacion" onclick="showVerificationReport()"
+                  class="flex text-xs font-bold bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white px-3 py-2 rounded-lg transition-colors items-center gap-1.5 border border-blue-200 shadow-sm">
+                  <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  Reporte de Validación
+                </button>
+
+                <!-- Generate Estimation Button -->
+                <button onclick="generarSiguienteEstimacion()"
+                  class="flex text-xs font-bold bg-inst-accent text-white hover:bg-inst-accentLight px-3 py-2 rounded-lg transition-colors items-center gap-1.5 shadow-sm">
+                  <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                  </svg>
+                  Generar Nueva Estimación
+                </button>
+
+                <!-- AI Context Drop Button -->
+                <input type="file" id="fileEstimacionDoc" accept=".xlsx, .xls, .csv, .pdf" class="hidden"
+                  onchange="handleExcelUpload(event, 'Estimaciones')">
+                <button onclick="document.getElementById('fileEstimacionDoc').click()"
+                  class="hidden md:flex text-xs font-bold bg-inst-gold/10 text-inst-gold hover:bg-inst-gold hover:text-white px-3 py-2 rounded-lg transition-colors items-center gap-1.5 border border-inst-gold/20 shadow-sm">
+                  <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  Validar Documento IA
+                </button>
+              </div>
+            </div>
+
+            <div id="expEstimaciones" class="flex flex-col gap-4">
+              <!-- JS Injects Timeline here -->
+              <div class="text-center text-gray-400 py-10 font-medium">Aún no hay estimaciones procesadas.</div>
+            </div>
+          </div>
+
+          <div id="tab-exp-catalogo"
+            class="exp-tab-content hidden p-0 flex-1 overflow-hidden bg-white flex-col relative w-full">
+            <div class="bg-gray-50 px-6 py-4 border-b border-gray-200 flex justify-between items-center shrink-0">
+              <div>
+                <h3 class="font-bold text-gray-800">Catálogo de Conceptos</h3>
+                <p class="text-xs text-gray-500">Volumetría y precios unitarios del contrato.</p>
+              </div>
+              <div class="flex gap-2">
+                <input type="file" id="fileCatExcel" accept=".xlsx, .xls, .csv, .pdf" class="hidden"
+                  onchange="handleExcelUpload(event, 'Catalogo_Conceptos')">
+                <button onclick="document.getElementById('fileCatExcel').click()"
+                  class="text-xs font-bold bg-green-600 text-white hover:bg-green-700 px-3 py-2 rounded-lg transition-colors flex items-center gap-1.5 shadow-sm">
+                  <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                      d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+                  </svg>
+                  Importar (PDF/Excel)
+                </button>
+              </div>
+            </div>
+            <div class="overflow-auto flex-1 custom-scrollbar w-full relative">
+              <table class="w-full relative text-left whitespace-nowrap">
+                <thead class="bg-gray-100 sticky top-0 z-10 shadow-sm text-xs text-gray-500 uppercase">
+                  <tr>
+                    <th class="px-3 py-2">Clave</th>
+                    <th class="px-3 py-2 w-1/2">Descripción</th>
+                    <th class="px-3 py-2 text-center">Unidad</th>
+                    <th class="px-3 py-2 text-right">Cantidad</th>
+                    <th class="px-3 py-2 text-right">P.U.</th>
+                    <th class="px-3 py-2 text-right">Importe</th>
+                  </tr>
+                </thead>
+                <tbody id="tblConceptosBody" class="divide-y divide-gray-100 text-sm">
+                  <tr>
+                    <td colspan="6" class="px-6 py-10 text-center text-gray-400">Cargando catálogo...</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Tab Content 4: Convenios y Anticipos -->
+          <div id="tab-exp-convenios"
+            class="exp-tab-content hidden p-6 flex-1 overflow-y-auto custom-scrollbar bg-gray-50/20 flex-col relative w-full">
+            <div id="tab-exp-convenios-content">
+              <div class="text-center text-gray-400 py-10 font-medium">Cargando convenios...</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- VIEW 3: DATABASE EXPLORER (Universal / Dynamic) -->
+      <section id="view-explorer" class="view-section hidden p-6 max-w-[1400px] mx-auto flex flex-col h-full">
+        <div class="flex justify-between items-end mb-4 shrink-0">
+          <p class="text-sm text-gray-500">Módulo Administrativo DML. Visualiza o inserta registros saltando
+            directamente a las tablas primarias del esquema.</p>
+          <button id="btnNewDynamic" onclick="openFormModal(activeTableName)"
+            class="hidden bg-white border border-gray-300 hover:border-inst-accent hover:text-inst-accent text-gray-700 px-4 py-2 rounded-lg text-sm font-semibold shadow-sm transition-colors flex items-center gap-2">
+            <svg fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+            </svg>
+            <span id="btnNewDynamicText">Crear en...</span>
+          </button>
+        </div>
+
+        <!-- Table Tabs -->
+        <div class="bg-white rounded-t-xl border border-gray-200 border-b-0 overflow-x-auto shadow-sm shrink-0">
+          <nav class="flex space-x-1 p-2 min-w-max" id="explorerTabs">
+            <!-- Tabs injected here -->
+          </nav>
+        </div>
+
+        <!-- Master Table -->
+        <div
+          class="bg-white border border-gray-200 rounded-b-xl shadow-soft flex-1 overflow-hidden flex flex-col relative h-[500px]">
+          <div class="overflow-auto flex-1 custom-scrollbar">
+            <table class="min-w-full divide-y divide-gray-200 text-left">
+              <thead class="bg-gray-50 sticky top-0 z-10 shadow-sm" id="explorerHead"></thead>
+              <tbody class="divide-y divide-gray-100 text-sm" id="explorerBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </main>
