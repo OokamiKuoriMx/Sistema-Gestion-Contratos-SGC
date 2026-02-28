@@ -42,7 +42,6 @@ function configurarBaseDeDatos() {
     if (_dbConfigured) return;
 
     const lock = LockService.getScriptLock();
-    // Wait up to 10 seconds for other processes to finish configuring DB
     try {
         lock.waitLock(10000);
     } catch (e) {
@@ -70,23 +69,62 @@ function configurarBaseDeDatos() {
                 sheet = ss.insertSheet(tabla);
                 sheet.appendRow(expectedHeaders);
                 Logger.log(`[BD] Hoja '${tabla}' creada con éxito.`);
+            } else if (sheet.getLastRow() === 0) {
+                sheet.appendRow(expectedHeaders);
             } else {
-                // Verificar si la hoja está completamente en blanco
-                if (sheet.getLastRow() === 0) {
-                    sheet.appendRow(expectedHeaders);
-                } else {
-                    // VALIDACIÓN DE COLUMNAS (Auto-Heal)
-                    // Leer encabezados actuales
-                    const currentHeaders = sheet.getRange(1, 1, 1, sheet.getLastColumn() || 1).getValues()[0].map(h => String(h).trim());
+                // ============================================================
+                // AUTO-HEAL COMPLETO: Agregar faltantes, eliminar sobrantes,
+                // y reordenar columnas para que coincidan con ESQUEMA_BD
+                // ============================================================
+                const lastCol = sheet.getLastColumn() || 1;
+                const currentHeaders = sheet.getRange(1, 1, 1, lastCol).getValues()[0].map(h => String(h).trim());
 
-                    // Encontrar campos faltantes según el esquema
-                    const missingColumns = expectedHeaders.filter(h => !currentHeaders.includes(h));
+                // Comparar: ¿el header actual coincide exactamente con el esperado?
+                const headersMatch = expectedHeaders.length === currentHeaders.length &&
+                    expectedHeaders.every((h, i) => h === currentHeaders[i]);
 
-                    if (missingColumns.length > 0) {
-                        Logger.log(`[BD] Reparando tabla '${tabla}': agregando campos [${missingColumns.join(', ')}]`);
-                        // Agregar las columnas faltantes al final del encabezado
-                        const startCol = currentHeaders.length + 1;
-                        sheet.getRange(1, startCol, 1, missingColumns.length).setValues([missingColumns]);
+                if (!headersMatch) {
+                    Logger.log(`[BD] Auto-Heal tabla '${tabla}': headers actuales [${currentHeaders.join(', ')}] → esperados [${expectedHeaders.join(', ')}]`);
+
+                    const lastRow = sheet.getLastRow();
+
+                    if (lastRow <= 1) {
+                        // Solo hay headers (sin datos): simplemente reescribir la fila 1
+                        sheet.getRange(1, 1, 1, lastCol).clearContent();
+                        sheet.getRange(1, 1, 1, expectedHeaders.length).setValues([expectedHeaders]);
+                    } else {
+                        // HAY DATOS: necesitamos reordenar las columnas preservando la data
+                        const allData = sheet.getRange(1, 1, lastRow, lastCol).getValues(); // includes header row
+                        const oldHeaders = allData[0].map(h => String(h).trim());
+
+                        // Construir los datos reorganizados según el orden del esquema
+                        const newData = [];
+                        // Fila 0 = headers esperados
+                        newData.push(expectedHeaders);
+
+                        // Filas de datos (1..lastRow-1)
+                        for (let r = 1; r < allData.length; r++) {
+                            const newRow = expectedHeaders.map(expectedCol => {
+                                const oldIdx = oldHeaders.indexOf(expectedCol);
+                                // Si la columna existía en la hoja vieja, traer su valor; si no, vacío
+                                return oldIdx !== -1 ? allData[r][oldIdx] : '';
+                            });
+                            newData.push(newRow);
+                        }
+
+                        // Limpiar la hoja completa y reescribir
+                        sheet.clearContents();
+                        sheet.getRange(1, 1, newData.length, expectedHeaders.length).setValues(newData);
+
+                        // Eliminar columnas sobrantes si las hay (la hoja puede tener más columnas de las necesarias)
+                        const totalCols = sheet.getMaxColumns();
+                        if (totalCols > expectedHeaders.length) {
+                            sheet.deleteColumns(expectedHeaders.length + 1, totalCols - expectedHeaders.length);
+                        }
+
+                        const removedCols = oldHeaders.filter(h => h && !expectedHeaders.includes(h));
+                        const addedCols = expectedHeaders.filter(h => !oldHeaders.includes(h));
+                        Logger.log(`[BD] Tabla '${tabla}' reparada. Eliminadas: [${removedCols.join(', ') || 'ninguna'}], Agregadas: [${addedCols.join(', ') || 'ninguna'}]`);
                     }
                 }
             }
@@ -286,6 +324,58 @@ function dbSelect(tableName, conditions = {}) {
     } catch (e) {
         console.error(e);
         const errorMsg = DEBUG_MODE ? `[BACKEND ERROR: dbSelect] ${e.message}\nStack: ${e.stack}` : e.message;
+        throw new Error(errorMsg);
+    }
+}
+
+/**
+ * Trae TODAS las tablas en una sola petición para evitar bloqueos por peticiones concurrentes (FetchError).
+ * Devuelve un diccionario { tableName: [data] }
+ */
+function dbSelectAll() {
+    try {
+        configurarBaseDeDatos();
+        const ss = getSpreadsheet();
+        let payload = {};
+
+        for (const tableName in ESQUEMA_BD) {
+            const sheet = ss.getSheetByName(tableName);
+            if (!sheet) {
+                payload[tableName] = [];
+                continue;
+            }
+            const data = sheet.getDataRange().getValues();
+            if (data.length <= 1) {
+                payload[tableName] = [];
+                continue;
+            }
+            const headers = data[0].map(h => String(h).trim());
+            let results = data.slice(1).map(row => {
+                let record = {};
+                headers.forEach((header, index) => {
+                    let cellValue = row[index];
+                    if (cellValue instanceof Date) {
+                        cellValue = cellValue.toISOString().split('T')[0];
+                    } else if (typeof cellValue === 'string') {
+                        cellValue = cellValue.replace(/\r?\n|\r|\u2028|\u2029/g, "  ").trim();
+                    }
+                    record[header] = cellValue;
+                });
+
+                if (tableName === 'Contratos') {
+                    const estadoCalculado = _actualizarEstatusDinamico(record);
+                    if (estadoCalculado !== record.Estado) {
+                        record.Estado = estadoCalculado;
+                    }
+                }
+                return record;
+            });
+            payload[tableName] = results;
+        }
+        return payload;
+    } catch (e) {
+        console.error(e);
+        const errorMsg = DEBUG_MODE ? `[BACKEND ERROR: dbSelectAll] ${e.message}\nStack: ${e.stack}` : e.message;
         throw new Error(errorMsg);
     }
 }

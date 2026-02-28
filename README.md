@@ -13,13 +13,8 @@ La aplicación está diseñada para usar una hoja de cálculo (Google Sheet) com
 
 ### 1. Configurar la Base de Datos (Google Sheet)
 1. Crea un nuevo Google Sheet.
-2. Copia el **ID de la Hoja de Cálculo** desde la URL (la cadena larga entre `/d/` y `/edit`).
-3. Abre el archivo `Code.gs`.
-4. Reemplaza el valor de `SHEET_ID` en la primera línea con tu ID de Hoja de Cálculo copiado:
-   ```javascript
-   const SHEET_ID = 'TU_ID_AQUI'; // <- Pega tu ID de Google Sheets aquí
-   ```
-   *(Nota: No es necesario crear pestañas o columnas, el script se encargará de crear la pestaña `Contratos` y los encabezados automáticamente al iniciar).*
+2. Abre el editor de **Apps Script** desde *Extensiones > Apps Script*.
+3. *(Nota: No es necesario crear pestañas o columnas manualmente, el script se encargará de crearlas y asignar los encabezados automáticamente al iniciar).*
 
 ### 2. Desplegar la Aplicación en Apps Script
 1. Si usas [clasp](https://github.com/google/clasp), simplemente haz `clasp push` para subir este código a tu proyecto.
