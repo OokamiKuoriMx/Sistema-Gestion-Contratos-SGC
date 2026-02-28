@@ -1592,26 +1592,23 @@
       }
 
       let bodyHTML = '';
-      data.forEach(row => {
+      data.forEach(function (row) {
         bodyHTML += '<tr class="hover:bg-inst-gold/5 transition-colors">';
-        headers.forEach(h => {
+
+        headers.forEach(function (h) {
           const raw = row[h] !== undefined ? String(row[h]) : '';
-          // Escape HTML entities
-          const val = raw.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/\x60/g, '&#96;')
-            .replace(/\n/g, ' ').replace(/\r/g, '');
+          const val = raw.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/\x60/g, '&#96;').replace(/\n/g, ' ').replace(/\r/g, '');
           bodyHTML += '<td class="px-4 py-3 whitespace-nowrap overflow-hidden text-ellipsis max-w-[200px]" title="' + val + '">' + val + '</td>';
         });
 
-        // --- CÓDIGO CORREGIDO PARA INTEGRIDAD ---
-        const safeId = String(row[pkName] || "").replace(/[^a-zA-Z0-9_\-]/g, "");
+        const safeId = String(row[pkName] || '').replace(/[^a-zA-Z0-9_\-]/g, '');
 
-        bodyHTML += "<td class=\"px-4 py-3 text-right whitespace-nowrap sticky right-0 bg-white group-hover:bg-gray-50 border-l border-gray-100\">";
-
-        // Usamos template literals y evitamos concatenar variables directamente en el onclick
-        bodyHTML += `<button onclick="editModalContextual('${tableName}', '${safeId}')" class="text-blue-600 hover:text-blue-800 mx-1 p-1">[Edit]</button><button onclick="deleteContextual('${tableName}', '${safeId}')" class="text-rose-500 hover:text-rose-700 mx-1 p-1">[Delete]</button>`;
-        bodyHTML += "</td></tr>";
+        bodyHTML += '<td class="px-4 py-3 text-right whitespace-nowrap sticky right-0 bg-white group-hover:bg-gray-50 border-l border-gray-100">';
+        bodyHTML += '<button onclick="editModalContextual(\'' + tableName + '\', \'' + safeId + '\')" class="text-blue-600 hover:text-blue-800 mx-1 p-1">[Edit]</button>';
+        bodyHTML += '<button onclick="deleteContextual(\'' + tableName + '\', \'' + safeId + '\')" class="text-rose-500 hover:text-rose-700 mx-1 p-1">[Delete]</button>';
+        bodyHTML += '</td></tr>';
       });
+
       tbody.innerHTML = bodyHTML;
     }
 
@@ -2490,22 +2487,22 @@
     function closeUploadModal() {
       const p = document.getElementById('uploadModalPanel');
       p.classList.remove('modal-enter-active'); p.classList.add('modal-exit');
-      setTimeout(() => { document.getElementById('uploadModal').classList.add('hidden'); document.getElementById('uploadModal').classList.remove('flex'); p.classList.remove('modal-exit'); }, 200);
+      setTimeout(function () {
+        document.getElementById('uploadModal').classList.add('hidden');
+        document.getElementById('uploadModal').classList.remove('flex');
+        p.classList.remove('modal-exit');
+      }, 200);
     }
 
-    // Opens AI Ingestion taking context of the currently open form.
     function openContextualAi() {
-      closeFormModal(); // Close the dynamic form underneath
-
-      // Use a small timeout to let the first modal animate out
-      setTimeout(() => {
-        // We are implicitly passing currentContextualTable here logic-wise
-        document.getElementById('uploadModalTitle') && (document.getElementById('uploadModalTitle').innerText = `Procesamiento para: ${currentContextualTable}`);
+      closeFormModal();
+      setTimeout(function () {
+        if (document.getElementById('uploadModalTitle')) {
+          document.getElementById('uploadModalTitle').innerText = 'Procesamiento para: ' + currentContextualTable;
+        }
         document.getElementById('uploadModal').classList.remove('hidden');
         document.getElementById('uploadModal').classList.add('flex');
-
-        // Fix animation sequence
-        setTimeout(() => {
+        setTimeout(function () {
           document.getElementById('uploadModalPanel').classList.add('modal-enter-active');
         }, 10);
       }, 250);
@@ -2526,15 +2523,14 @@
 
       const docName = currentContextualTable ? (nameMap[currentContextualTable] || 'Documento') : 'Documento';
 
-      showLoader(`Procesando ${docName} con IA...`);
+      showLoader('Procesando ' + docName + ' con IA...');
       closeUploadModal();
 
-      // Pass context if in expediente view
       let ctx = null;
       if (window.currentExpedienteId) ctx = { 'ID_Contrato': window.currentExpedienteId };
 
       const reader = new FileReader();
-      reader.onload = e => {
+      reader.onload = function (e) {
         let dataToSend = e.target.result;
         let mimeToSend = file.type;
 
@@ -2544,7 +2540,6 @@
             const csv = XLSX.utils.sheet_to_csv(workbook.Sheets[workbook.SheetNames[0]]);
             dataToSend = "data:text/csv;base64," + btoa(unescape(encodeURIComponent(csv)));
             mimeToSend = "text/csv";
-            console.log("SGC: Excel convertido para AI.");
           } catch (err) {
             hideLoader();
             return toast("Error en conversión Excel: " + err.message, "error");
@@ -2552,14 +2547,16 @@
         }
 
         google.script.run
-          .withSuccessHandler(res => {
+          .withSuccessHandler(function (res) {
             hideLoader();
             if (res.success) {
               toast("Base de conocimiento relacional actualizada con IA.");
-              preloadData(); // fully reload app
-            } else toast("Atención AI: " + res.message, "error");
+              preloadData();
+            } else {
+              toast("Atención AI: " + res.message, "error");
+            }
           })
-          .withFailureHandler(err => { hideLoader(); toast(err.message, "error"); })
+          .withFailureHandler(function (err) { hideLoader(); toast(err.message, "error"); })
           .processDocumentWithAI(dataToSend, mimeToSend, currentContextualTable, ctx);
       };
 
@@ -2569,29 +2566,30 @@
         reader.readAsDataURL(file);
       }
     }
+
     // --- DRAG AND DROP LOGIC ---
     function handleAiFileSelect(files) {
       if (files && files.length > 0) {
         document.getElementById('fileName').innerText = files[0].name;
-        document.getElementById('aiFile').files = files; // Sync Drop with Input
+        document.getElementById('aiFile').files = files;
       } else {
         document.getElementById('fileName').innerText = 'Arrastra aquí tu Documento o Haz Clic';
       }
     }
 
     const dropzone = document.getElementById('dropzone');
-    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(function (eventName) {
       dropzone.addEventListener(eventName, preventDefaults, false);
     });
 
     function preventDefaults(e) { e.preventDefault(); e.stopPropagation(); }
 
-    ['dragenter', 'dragover'].forEach(eventName => {
-      dropzone.addEventListener(eventName, () => dropzone.classList.add('border-inst-gold', 'bg-inst-gold/10'), false);
+    ['dragenter', 'dragover'].forEach(function (eventName) {
+      dropzone.addEventListener(eventName, function () { dropzone.classList.add('border-inst-gold', 'bg-inst-gold/10'); }, false);
     });
 
-    ['dragleave', 'drop'].forEach(eventName => {
-      dropzone.addEventListener(eventName, () => dropzone.classList.remove('border-inst-gold', 'bg-inst-gold/10'), false);
+    ['dragleave', 'drop'].forEach(function (eventName) {
+      dropzone.addEventListener(eventName, function () { dropzone.classList.remove('border-inst-gold', 'bg-inst-gold/10'); }, false);
     });
 
     dropzone.addEventListener('drop', handleDrop, false);
@@ -2603,7 +2601,7 @@
   </script>
 
   <script>
-    console.log("SGC Debug Engine (Native Console) Initialized");
+    console.log("SGC Debug Engine Inicializado Correctamente");
   </script>
 </body>
 
