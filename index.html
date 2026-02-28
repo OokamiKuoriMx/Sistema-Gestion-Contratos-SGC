@@ -1598,16 +1598,19 @@
           const raw = row[h] !== undefined ? String(row[h]) : '';
           // Escape HTML entities
           const val = raw.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/`/g, '&#96;')
+            .replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/\x60/g, '&#96;')
             .replace(/\n/g, ' ').replace(/\r/g, '');
           bodyHTML += '<td class="px-4 py-3 whitespace-nowrap overflow-hidden text-ellipsis max-w-[200px]" title="' + val + '">' + val + '</td>';
         });
 
-        const safeId = String(row[pkName] || '').replace(/[^a-zA-Z0-9_\-]/g, '');
-        bodyHTML += '<td class="px-4 py-3 text-right whitespace-nowrap sticky right-0 bg-white group-hover:bg-gray-50 border-l border-gray-100">';
-        bodyHTML += '<button onclick="editModalContextual(\'' + tableName + '\', \'' + safeId + '\')" class="text-blue-600 hover:text-blue-800 mx-1 p-1">[Edit]</button>';
-        bodyHTML += '<button onclick="deleteContextual(\'' + tableName + '\', \'' + safeId + '\')" class="text-rose-500 hover:text-rose-700 mx-1 p-1">[Delete]</button>';
-        bodyHTML += '</td></tr>';
+        // --- CÓDIGO CORREGIDO PARA INTEGRIDAD ---
+        const safeId = String(row[pkName] || "").replace(/[^a-zA-Z0-9_\-]/g, "");
+
+        bodyHTML += "<td class=\"px-4 py-3 text-right whitespace-nowrap sticky right-0 bg-white group-hover:bg-gray-50 border-l border-gray-100\">";
+
+        // Usamos template literals y evitamos concatenar variables directamente en el onclick
+        bodyHTML += `<button onclick="editModalContextual('${tableName}', '${safeId}')" class="text-blue-600 hover:text-blue-800 mx-1 p-1">[Edit]</button><button onclick="deleteContextual('${tableName}', '${safeId}')" class="text-rose-500 hover:text-rose-700 mx-1 p-1">[Delete]</button>`;
+        bodyHTML += "</td></tr>";
       });
       tbody.innerHTML = bodyHTML;
     }
