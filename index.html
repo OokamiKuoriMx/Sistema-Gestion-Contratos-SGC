@@ -61,16 +61,16 @@
 
 <body class="flex h-screen overflow-hidden text-inst-textPrimary">
 
-  <?!= include('Component_Navbar'); ?>
+  <?!= include('Navbar.comp'); ?>
 
-  <?!= include('Component_MainTable'); ?>
+  <?!= include('MainTable.comp'); ?>
 
-  <?!= include('Component_Modals'); ?>
+  <?!= include('Modals.comp'); ?>
 
 
   <!-- ==================== FRONTEND LOGIC (SPA) ==================== -->
-  <?!= include('JS_MainLogic'); ?>
-  <?!= include('JS_AILogic'); ?>
+  <?!= include('MainLogic.js'); ?>
+  <?!= include('AILogic.js'); ?>
 
   <script>
     console.log("SGC Debug Engine Inicializado Correctamente");
