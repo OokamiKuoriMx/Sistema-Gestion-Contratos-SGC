@@ -947,7 +947,8 @@
       showLoader("Actualizando datos...");
 
       google.script.run
-        .withSuccessHandler(payload => {
+        .withSuccessHandler(response => {
+          let payload = typeof response === 'string' ? JSON.parse(response) : response;
           console.log("[ÉXITO PRELOAD] Toda la base de datos descargada sin bloqueos concurrentes.");
           Object.keys(payload).forEach(tableName => {
             DB[tableName] = payload[tableName];
@@ -1565,8 +1566,9 @@
 
       google.script.run
         .withSuccessHandler(data => {
-          DB[tableName] = data; // cache for UI updates
-          renderExplorerGrid(tableName, data);
+          const parsedData = typeof data === 'string' ? JSON.parse(data) : data;
+          DB[tableName] = parsedData; // cache for UI updates
+          renderExplorerGrid(tableName, parsedData);
         })
         .withFailureHandler(err => toast(err.message, 'error'))
         .dbSelect(tableName, {});
@@ -1580,12 +1582,12 @@
       const tbody = document.getElementById('explorerBody');
 
       let headHTML = '<tr>';
-      headers.forEach(h => headHTML += `< th class="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap" > ${h.replace(/_/g, " ")}</th > `);
-      headHTML += `< th class="px-4 py-3 text-right sticky right-0 bg-gray-50 shadow-sm" > Acciones</th ></tr > `;
+      headers.forEach(h => headHTML += '<th class="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap">' + h.replace(/_/g, " ") + '</th>');
+      headHTML += '<th class="px-4 py-3 text-right sticky right-0 bg-gray-50 shadow-sm">Acciones</th></tr>';
       thead.innerHTML = headHTML;
 
       if (data.length === 0) {
-        tbody.innerHTML = `< tr > <td colspan="${headers.length + 1}" class="px-4 py-8 text-center text-gray-400 font-medium">No existen registros en esta tabla. Usa el botón superior para crear.</td></tr > `;
+        tbody.innerHTML = '<tr><td colspan="' + (headers.length + 1) + '" class="px-4 py-8 text-center text-gray-400 font-medium">No existen registros en esta tabla. Usa el botón superior para crear.</td></tr>';
         return;
       }
 
@@ -1594,19 +1596,18 @@
         bodyHTML += '<tr class="hover:bg-inst-gold/5 transition-colors">';
         headers.forEach(h => {
           const raw = row[h] !== undefined ? String(row[h]) : '';
-          // Escape HTML entities — use hex escapes for < and > to avoid breaking GAS HtmlService Caja sanitizer
-          const val = raw.replace(/&/g, '&amp;').replace(/\x3c/g, '&lt;').replace(/\x3e/g, '&gt;')
+          // Escape HTML entities
+          const val = raw.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
             .replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/`/g, '&#96;')
             .replace(/\n/g, ' ').replace(/\r/g, '');
           bodyHTML += '<td class="px-4 py-3 whitespace-nowrap overflow-hidden text-ellipsis max-w-[200px]" title="' + val + '">' + val + '</td>';
         });
 
-        // Sanitize PK for onclick: strip everything except alphanumerics, hyphens, underscores
         const safeId = String(row[pkName] || '').replace(/[^a-zA-Z0-9_\-]/g, '');
-        bodyHTML += '<td class="px-4 py-3 text-right whitespace-nowrap sticky right-0 bg-white group-hover:bg-gray-50 border-l border-gray-100">' +
-          '<button onclick="editModalContextual(\'' + tableName + '\', \'' + safeId + '\')" class="text-blue-600 hover:text-blue-800 mx-1 p-1"><svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg></button>' +
-          '<button onclick="deleteContextual(\'' + tableName + '\', \'' + safeId + '\')" class="text-rose-500 hover:text-rose-700 mx-1 p-1"><svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>' +
-          '</td></tr>';
+        bodyHTML += '<td class="px-4 py-3 text-right whitespace-nowrap sticky right-0 bg-white group-hover:bg-gray-50 border-l border-gray-100">';
+        bodyHTML += '<button onclick="editModalContextual(\'' + tableName + '\', \'' + safeId + '\')" class="text-blue-600 hover:text-blue-800 mx-1 p-1">[Edit]</button>';
+        bodyHTML += '<button onclick="deleteContextual(\'' + tableName + '\', \'' + safeId + '\')" class="text-rose-500 hover:text-rose-700 mx-1 p-1">[Delete]</button>';
+        bodyHTML += '</td></tr>';
       });
       tbody.innerHTML = bodyHTML;
     }

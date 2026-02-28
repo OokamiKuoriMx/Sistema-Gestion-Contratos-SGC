@@ -290,6 +290,9 @@ function dbSelect(tableName, conditions = {}) {
             let record = {};
             headers.forEach((header, index) => {
                 let cellValue = row[index];
+                if (cellValue === undefined || cellValue === null) {
+                    cellValue = '';
+                }
                 if (cellValue instanceof Date) {
                     cellValue = cellValue.toISOString().split('T')[0];
                 } else if (typeof cellValue === 'string') {
@@ -320,7 +323,8 @@ function dbSelect(tableName, conditions = {}) {
             });
         }
 
-        return results;
+        // Return stringified data to avoid google.script.run serialization bugs
+        return JSON.stringify(results);
     } catch (e) {
         console.error(e);
         const errorMsg = DEBUG_MODE ? `[BACKEND ERROR: dbSelect] ${e.message}\nStack: ${e.stack}` : e.message;
@@ -354,6 +358,9 @@ function dbSelectAll() {
                 let record = {};
                 headers.forEach((header, index) => {
                     let cellValue = row[index];
+                    if (cellValue === undefined || cellValue === null) {
+                        cellValue = '';
+                    }
                     if (cellValue instanceof Date) {
                         cellValue = cellValue.toISOString().split('T')[0];
                     } else if (typeof cellValue === 'string') {
@@ -372,7 +379,7 @@ function dbSelectAll() {
             });
             payload[tableName] = results;
         }
-        return payload;
+        return JSON.stringify(payload);
     } catch (e) {
         console.error(e);
         const errorMsg = DEBUG_MODE ? `[BACKEND ERROR: dbSelectAll] ${e.message}\nStack: ${e.stack}` : e.message;
